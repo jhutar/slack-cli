@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -81,7 +82,39 @@ def run(args, config):
     sys.stdout.write(output)
 
 
+def _parse_after(value):
+    if value is None:
+        return None
+    m = re.match(r"^(\d+)([MH])$", value)
+    if m:
+        amount = int(m.group(1))
+        unit = m.group(2)
+        seconds = amount * 60 if unit == "M" else amount * 3600
+        return {"type": "duration", "seconds": seconds}
+    try:
+        count = int(value)
+        if count <= 0:
+            raise ValueError
+        return {"type": "count", "count": count}
+    except ValueError:
+        print(
+            f"Error: Invalid --after value '{value}'. "
+            f"Use a positive integer or duration (e.g., 30M, 2H).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def _fetch_messages(api, link, args):
+    after = _parse_after(getattr(args, "after", None))
+
+    if after and link.is_thread:
+        print(
+            "Error: --after is only supported for channel messages, not thread links.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     if link.is_thread and link.is_reply:
         resp = api.call(
             "conversations.history",
@@ -138,7 +171,36 @@ def _fetch_messages(api, link, args):
         if thread_msgs:
             msg["_replies"] = thread_msgs[1:]
 
-    return [msg]
+    if not after:
+        return [msg]
+
+    params = {
+        "channel": link.channel_id,
+        "oldest": link.message_ts,
+        "inclusive": "true",
+    }
+
+    if after["type"] == "count":
+        params["limit"] = str(after["count"] + 1)
+    else:
+        latest_ts = float(link.message_ts) + after["seconds"]
+        params["latest"] = str(latest_ts)
+
+    resp = api.call("conversations.history", params)
+    follow_ups = resp.get("messages", [])
+    follow_ups.sort(key=lambda m: float(m.get("ts", "0")))
+
+    for fu in follow_ups:
+        if int(fu.get("reply_count", 0)) > 0:
+            thread_msgs = api.call_paginated(
+                "conversations.replies",
+                {"channel": link.channel_id, "ts": fu["ts"], "limit": "200"},
+                "messages",
+            )
+            if thread_msgs:
+                fu["_replies"] = thread_msgs[1:]
+
+    return follow_ups
 
 
 def _build_message(raw, user_map, channel_map, api, channels_cache, channels_cache_path):
@@ -171,8 +233,6 @@ def _build_message(raw, user_map, channel_map, api, channels_cache, channels_cac
 
 
 def _collect_channel_refs(text, channel_map, api, channels_cache, channels_cache_path):
-    import re
-
     for m in re.finditer(r"<#([CDGW][A-Z0-9]+)(?:\|([^>]*))?>", text):
         cid = m.group(1)
         name = m.group(2)

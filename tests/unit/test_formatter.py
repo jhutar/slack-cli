@@ -52,3 +52,30 @@ def test_multiple_messages_numbered():
     result = format_messages(msgs)
     assert "### 1. @alice" in result
     assert "### 2. @bob" in result
+
+
+def test_multi_message_with_inline_thread():
+    msgs = [
+        _msg(text="msg one"),
+        _msg(text="msg two", user_name="bob"),
+        _msg(
+            text="msg three with thread",
+            user_name="carol",
+            replies=[
+                _msg(text="thread reply 1", user_name="dave"),
+                _msg(text="thread reply 2", user_name="eve"),
+            ],
+        ),
+        _msg(text="msg four", user_name="frank"),
+    ]
+    result = format_messages(msgs)
+    assert "### 1. @alice" in result
+    assert "### 2. @bob" in result
+    assert "### 3. @carol" in result
+    assert "#### 3.1. @dave" in result
+    assert "#### 3.2. @eve" in result
+    assert "### 4. @frank" in result
+    lines = result.split("\n")
+    thread_idx = next(i for i, l in enumerate(lines) if "3.2. @eve" in l)
+    msg4_idx = next(i for i, l in enumerate(lines) if "4. @frank" in l)
+    assert thread_idx < msg4_idx

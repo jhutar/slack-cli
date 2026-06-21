@@ -162,6 +162,86 @@ class TestReplyLink:
         assert "@Bob" in out
 
 
+class TestAfterCount:
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_after_count(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post([
+            _slack_ok({
+                "messages": [{
+                    "user": "U123",
+                    "text": "Original",
+                    "ts": "1718972400.000000",
+                    "reply_count": 0,
+                }]
+            }),
+            _slack_ok({
+                "messages": [
+                    {"user": "U123", "text": "Original", "ts": "1718972400.000000", "reply_count": 0},
+                    {"user": "U456", "text": "Follow up 1", "ts": "1718972401.000000", "reply_count": 0},
+                    {"user": "U789", "text": "Follow up 2", "ts": "1718972402.000000", "reply_count": 0},
+                ]
+            }),
+            _slack_ok({"user": {"name": "alice", "profile": {"display_name": "Alice", "real_name": ""}}}),
+            _slack_ok({"user": {"name": "bob", "profile": {"display_name": "Bob", "real_name": ""}}}),
+            _slack_ok({"user": {"name": "carol", "profile": {"display_name": "Carol", "real_name": ""}}}),
+        ])
+
+        link = "https://test.slack.com/archives/C01234567/p1718972400000000"
+        run(_make_args(link, after="2"), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Original" in out
+        assert "Follow up 1" in out
+        assert "Follow up 2" in out
+
+
+class TestAfterDuration:
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_after_duration(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post([
+            _slack_ok({
+                "messages": [{
+                    "user": "U123",
+                    "text": "Original",
+                    "ts": "1718972400.000000",
+                    "reply_count": 0,
+                }]
+            }),
+            _slack_ok({
+                "messages": [
+                    {"user": "U123", "text": "Original", "ts": "1718972400.000000", "reply_count": 0},
+                    {"user": "U456", "text": "Within 2H", "ts": "1718972500.000000", "reply_count": 0},
+                ]
+            }),
+            _slack_ok({"user": {"name": "alice", "profile": {"display_name": "Alice", "real_name": ""}}}),
+            _slack_ok({"user": {"name": "bob", "profile": {"display_name": "Bob", "real_name": ""}}}),
+        ])
+
+        link = "https://test.slack.com/archives/C01234567/p1718972400000000"
+        run(_make_args(link, after="2H"), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Original" in out
+        assert "Within 2H" in out
+
+
+class TestAfterWithThread:
+    def test_after_with_thread_link_error(self, capsys):
+        link = (
+            "https://test.slack.com/archives/C01234567/p1718972400000000"
+            "?thread_ts=1718972400.000000&cid=C01234567"
+        )
+        with pytest.raises(SystemExit) as exc:
+            run(_make_args(link, after="5"), _make_config())
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "--after" in err
+
+
 class TestMissingTokens:
     def test_missing_xoxc(self, capsys):
         config = _make_config()
