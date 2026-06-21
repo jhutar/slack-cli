@@ -101,15 +101,11 @@ def _fetch_messages(api, link, args):
 
     if link.is_thread:
         thread_ts = link.thread_ts or link.message_ts
-        resp = api.call(
+        msgs = api.call_paginated(
             "conversations.replies",
-            {
-                "channel": link.channel_id,
-                "ts": thread_ts,
-                "limit": "200",
-            },
+            {"channel": link.channel_id, "ts": thread_ts, "limit": "200"},
+            "messages",
         )
-        msgs = resp.get("messages", [])
         if not msgs:
             print("Error: Thread not found.", file=sys.stderr)
             sys.exit(3)
@@ -134,15 +130,11 @@ def _fetch_messages(api, link, args):
 
     msg = msgs[0]
     if int(msg.get("reply_count", 0)) > 0:
-        thread_resp = api.call(
+        thread_msgs = api.call_paginated(
             "conversations.replies",
-            {
-                "channel": link.channel_id,
-                "ts": msg["ts"],
-                "limit": "200",
-            },
+            {"channel": link.channel_id, "ts": msg["ts"], "limit": "200"},
+            "messages",
         )
-        thread_msgs = thread_resp.get("messages", [])
         if thread_msgs:
             msg["_replies"] = thread_msgs[1:]
 

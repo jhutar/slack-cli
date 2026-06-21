@@ -64,3 +64,18 @@ class SlackAPI:
             raise SlackAPIError(method, error)
 
         raise SlackAPIError(method, "max_retries_exceeded")
+
+    def call_paginated(self, method, params, key):
+        all_items = []
+        params = dict(params) if params else {}
+        while True:
+            resp = self.call(method, params)
+            items = resp.get(key, [])
+            all_items.extend(items)
+
+            cursor = resp.get("response_metadata", {}).get("next_cursor", "")
+            if not cursor:
+                break
+            params["cursor"] = cursor
+
+        return all_items
