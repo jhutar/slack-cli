@@ -29,14 +29,18 @@ formatted as Markdown.
 1. **Given** a valid Slack channel message link, **When** the user runs
    the tool with that link, **Then** stdout contains the message with
    author display name, date/time, and content in Markdown format.
-2. **Given** a valid Slack channel message link, **When** the message
+2. **Given** a valid Slack channel message link to a message that has
+   thread replies, **When** the user runs the tool, **Then** the output
+   includes the message followed by all its thread replies (the full
+   thread is always shown when the linked message has replies).
+3. **Given** a valid Slack channel message link, **When** the message
    contains code blocks, links, bold, and italic text, **Then** the
    output preserves code blocks and links in standard Markdown syntax,
    and renders bold/italic in standard Markdown.
-3. **Given** a valid Slack channel message link to a message that
+4. **Given** a valid Slack channel message link to a message that
    mentions other users (e.g. `<@U12345>`), **When** the user runs the
    tool, **Then** mentions are resolved to display names in the output.
-4. **Given** an invalid or malformed Slack link, **When** the user runs
+5. **Given** an invalid or malformed Slack link, **When** the user runs
    the tool, **Then** the tool exits with a non-zero exit code and
    prints a clear error message to stderr explaining the link format
    is not recognized.
@@ -57,15 +61,15 @@ proper numbering.
 
 **Acceptance Scenarios**:
 
-1. **Given** a Slack link that points to a thread (URL contains
-   `thread_ts` parameter), **When** the user runs the tool, **Then**
-   stdout contains all messages in that thread in chronological order.
-2. **Given** a Slack link to a message that has thread replies, **When**
-   the user runs the tool, **Then** stdout contains the parent message
-   followed by all replies.
-3. **Given** a thread with 50 replies, **When** the user runs the tool,
-   **Then** all 50 replies are included in the output (pagination is
-   handled automatically).
+1. **Given** a Slack link to a message that started a thread (the parent
+   message), **When** the user runs the tool, **Then** stdout contains
+   the parent message followed by all replies in chronological order.
+2. **Given** a Slack link to a specific reply within a thread (not the
+   parent), **When** the user runs the tool, **Then** stdout contains
+   only that single reply message (not the full thread).
+3. **Given** a thread with 50 replies, **When** the user runs the tool
+   with the parent message link, **Then** all 50 replies are included
+   in the output (pagination is handled automatically).
 
 ---
 
@@ -153,6 +157,14 @@ content appears on stdout.
 - What happens with very long threads (hundreds of replies)? The tool
   paginates through the API automatically and outputs all messages.
 
+## Clarifications
+
+### Session 2026-06-21
+
+- Q: When a linked channel message has thread replies, should the tool show the thread? → A: Always include the full thread when the linked message has replies.
+- Q: When a link points to a specific reply within a thread, what should be shown? → A: Show only that single reply message, not the entire thread.
+- Q: What environment variable names should be used for authentication? → A: Own namespace: `SLACK_CLI_XOXC_TOKEN`, `SLACK_CLI_XOXD_TOKEN`, `SLACK_CLI_USER_AGENT`.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -162,8 +174,14 @@ content appears on stdout.
 - **FR-002**: The tool MUST parse Slack links in the format
   `https://<workspace>.slack.com/archives/<channel_id>/p<timestamp>`
   and extract the workspace, channel ID, and message timestamp.
-- **FR-003**: The tool MUST detect thread links (containing `thread_ts`
-  query parameter) and fetch the full thread.
+- **FR-003**: When the linked message is a thread parent (has replies),
+  the tool MUST fetch and display the full thread.
+- **FR-003a**: When a linked channel message has thread replies, the
+  tool MUST always include the full thread in the output, even without
+  an explicit thread link or `--after` flag.
+- **FR-003b**: When the link points to a specific reply within a thread
+  (not the parent), the tool MUST display only that single reply
+  message, not the entire thread.
 - **FR-004**: The tool MUST support an `--after` option that accepts
   either a positive integer (number of messages) or a duration string
   (e.g., `30M`, `2H`) to fetch follow-up messages.
@@ -182,14 +200,16 @@ content appears on stdout.
 - **FR-011**: The tool MUST handle Slack API pagination transparently
   when fetching threads or follow-up messages.
 - **FR-012**: The tool MUST authenticate using a pair of Slack
-  session-based tokens: an `xoxc` token (client token) and an `xoxd`
-  token (cookie token), both read from environment variables.
+  session-based tokens: an `xoxc` token (client token) read from
+  `SLACK_CLI_XOXC_TOKEN` and an `xoxd` token (cookie token) read from
+  `SLACK_CLI_XOXD_TOKEN`.
 - **FR-012a**: The tool MUST support a configurable User-Agent header
-  via environment variable, required for enterprise Slack workspaces
-  that reject non-browser API requests and invalidate sessions.
+  via the `SLACK_CLI_USER_AGENT` environment variable, required for
+  enterprise Slack workspaces that reject non-browser API requests and
+  invalidate sessions.
 - **FR-012b**: The tool MUST fail immediately with a clear error if
-  either the xoxc or xoxd token is missing, explaining which
-  environment variables need to be set.
+  either `SLACK_CLI_XOXC_TOKEN` or `SLACK_CLI_XOXD_TOKEN` is missing,
+  naming the specific variable(s) that need to be set.
 - **FR-013**: The tool MUST support DM links (channel IDs starting with
   `D` for 1:1 DMs and `G` for group DMs) using the same interface.
 - **FR-014**: When fetching follow-up channel messages that contain
