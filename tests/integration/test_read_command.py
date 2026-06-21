@@ -261,6 +261,76 @@ class TestMissingTokens:
         assert exc.value.code == 2
 
 
+class TestDMMessage:
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_dm_message(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post([
+            _slack_ok({
+                "messages": [{
+                    "user": "U123",
+                    "text": "DM content",
+                    "ts": "1718972400.000000",
+                    "reply_count": 0,
+                }]
+            }),
+            _slack_ok({"user": {"name": "alice", "profile": {"display_name": "Alice", "real_name": ""}}}),
+        ])
+
+        link = "https://test.slack.com/archives/D01234567/p1718972400000000"
+        run(_make_args(link), _make_config())
+
+        out = capsys.readouterr().out
+        assert "DM content" in out
+        assert "@Alice" in out
+
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_dm_with_after(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post([
+            _slack_ok({
+                "messages": [{
+                    "user": "U123",
+                    "text": "DM original",
+                    "ts": "1718972400.000000",
+                    "reply_count": 0,
+                }]
+            }),
+            _slack_ok({
+                "messages": [
+                    {"user": "U123", "text": "DM original", "ts": "1718972400.000000", "reply_count": 0},
+                    {"user": "U456", "text": "DM follow up", "ts": "1718972401.000000", "reply_count": 0},
+                ]
+            }),
+            _slack_ok({"user": {"name": "alice", "profile": {"display_name": "Alice", "real_name": ""}}}),
+            _slack_ok({"user": {"name": "bob", "profile": {"display_name": "Bob", "real_name": ""}}}),
+        ])
+
+        link = "https://test.slack.com/archives/D01234567/p1718972400000000"
+        run(_make_args(link, after="3"), _make_config())
+
+        out = capsys.readouterr().out
+        assert "DM original" in out
+        assert "DM follow up" in out
+
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_dm_access_denied(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post([
+            {"ok": False, "error": "channel_not_found"},
+        ])
+
+        link = "https://test.slack.com/archives/D01234567/p1718972400000000"
+        with pytest.raises(SystemExit) as exc:
+            run(_make_args(link), _make_config())
+        assert exc.value.code == 3
+        err = capsys.readouterr().err
+        assert "DM" in err
+
+
 class TestInvalidLink:
     def test_invalid_link(self, capsys):
         link = "https://not-slack.com/foo"
