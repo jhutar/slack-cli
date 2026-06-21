@@ -35,9 +35,9 @@ These are **not** OAuth app tokens — no Slack app registration required.
 ### Getting your tokens
 
 1. Open Slack in your browser and log in
-2. Open Developer Tools (F12) → Application → Cookies
+2. Open Developer Tools (F12) → Network → select some request → Cookies
 3. Copy the `d` cookie value — this is your **xoxd** token (starts with `xoxd-`)
-4. Open the browser console and run: `JSON.parse(localStorage.getItem('localConfig_v2')).teams[Object.keys(JSON.parse(localStorage.getItem('localConfig_v2')).teams)[0]].token`
+4. Open Developer Tools (F12) → Console and run: `JSON.parse(localStorage.getItem('localConfig_v2')).teams[Object.keys(JSON.parse(localStorage.getItem('localConfig_v2')).teams)[0]].token`
 5. The output is your **xoxc** token (starts with `xoxc-`)
 
 ### Configuration
