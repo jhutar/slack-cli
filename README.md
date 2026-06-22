@@ -116,6 +116,14 @@ slack-cli read 'https://mywork.slack.com/archives/C01234/p1234567890123456' | ai
 slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234567890123456'
 ```
 
+## Related Projects and Resources
+
+- [Retrieving and Using Slack Cookies for Authentication](https://www.papermtn.co.uk/retrieving-and-using-slack-cookies-for-authentication/) — Blog post explaining how to extract Slack's `d` cookie from a browser to obtain a user session token.
+- [slack-mcp-server](https://github.com/korotovsky/slack-mcp-server) — An MCP server enabling AI assistants to interact with Slack workspaces via messages, search, and DMs.
+- [slacker](https://github.com/shanemcd/slacker) — A CLI tool that extracts Slack browser session credentials to automate Slack API calls.
+- [slack-token-extractor](https://github.com/maorfr/slack-token-extractor) — A toolkit for extracting Slack xoxc/xoxd tokens via browser extensions or Playwright automation.
+- [slacktokens](https://github.com/hraftery/slacktokens) — A Python library that extracts personal Slack API tokens and cookies from the Slack desktop app.
+
 ## Development
 
 ```bash
