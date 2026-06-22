@@ -10,7 +10,25 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Extract tokens from Flatpak Slack and update config (Priority: P1)
+### User Story 1 - Login via browser cookie (Priority: P1) *(already implemented)*
+
+A user has access to Slack in their browser and wants to configure slack-cli by providing only the `d` cookie (xoxd token) and a workspace URL. The tool automatically fetches the xoxc token, verifies authentication, and writes both tokens to the config file.
+
+**Why this priority**: This is the simplest authentication path — it requires only one value from the browser and handles everything else automatically.
+
+**Independent Test**: Can be fully tested by running `slack-cli login mywork.slack.com --xoxd-token "xoxd-..."` and verifying the config file is written with valid tokens that authenticate against the Slack API.
+
+**Acceptance Scenarios**:
+
+1. **Given** a valid xoxd token and workspace URL, **When** the user runs the login command, **Then** the xoxc token is fetched automatically, authentication is verified, and both tokens are written to the config file.
+2. **Given** no xoxd token is provided on the command line, **When** the user runs the login command, **Then** the tool prompts interactively for the xoxd token.
+3. **Given** an expired or invalid xoxd token, **When** the user runs the login command, **Then** the tool reports a clear error that the token may be expired.
+4. **Given** a workspace URL without the `.slack.com` suffix, **When** the user runs the login command, **Then** the tool appends `.slack.com` automatically.
+5. **Given** the config file already exists with other settings, **When** the user runs the login command, **Then** the auth section is updated while preserving other sections (logging, cache).
+
+---
+
+### User Story 2 - Extract tokens from Flatpak Slack and update config (Priority: P1)
 
 A user has the Slack desktop app installed as a Flatpak and wants to automatically extract their authentication tokens (xoxc + xoxd cookie) and write them to the slack-cli config file, so they can use slack-cli without manually copying tokens from a browser.
 
@@ -26,7 +44,7 @@ A user has the Slack desktop app installed as a Flatpak and wants to automatical
 
 ---
 
-### User Story 2 - Extract tokens from standard Linux Slack install (Priority: P2)
+### User Story 3 - Extract tokens from standard Linux Slack install (Priority: P2)
 
 A user has the Slack desktop app installed via the standard (non-Flatpak) method (`~/.config/Slack/`) and wants to extract tokens the same way.
 
@@ -41,7 +59,7 @@ A user has the Slack desktop app installed via the standard (non-Flatpak) method
 
 ---
 
-### User Story 3 - List available workspaces without writing config (Priority: P3)
+### User Story 4 - List available workspaces without writing config (Priority: P3)
 
 A user wants to see which workspaces are available in their Slack app without modifying any configuration.
 
@@ -66,17 +84,25 @@ A user wants to see which workspaces are available in their Slack app without mo
 
 ### Functional Requirements
 
-- **FR-001**: System MUST extract xoxc tokens from the Slack desktop app's LevelDB local storage.
-- **FR-002**: System MUST extract the xoxd cookie (the `d` cookie) from the Slack desktop app's cookie store.
-- **FR-003**: System MUST support the Flatpak Slack data path (`~/.var/app/com.slack.Slack/config/Slack/`).
-- **FR-004**: System MUST support the standard Linux Slack data path (`~/.config/Slack/`).
-- **FR-005**: System MUST auto-detect which Slack installation path is available, preferring the one that exists.
-- **FR-006**: When multiple workspaces are found, system MUST present the user with a list and let them choose which workspace to configure.
-- **FR-007**: System MUST write the selected workspace's xoxc token and the xoxd cookie to the config file using the existing `write_config` mechanism.
-- **FR-008**: System MUST verify extracted tokens by calling the Slack API (`auth.test`) before writing the config, just as the existing `login` command does.
-- **FR-009**: System MUST provide a list-only mode that displays discovered workspaces without modifying files.
-- **FR-010**: System MUST fail with a clear, actionable error message when the Slack app's database is locked (app is running), no Slack installation is found, or the database contents are unrecognizable.
-- **FR-011**: When both Flatpak and standard installations exist, system MUST prefer the Flatpak path first and fall back to the standard path only if the Flatpak path does not exist.
+#### Browser cookie login *(already implemented)*
+
+- **FR-001**: System MUST accept a workspace URL and xoxd token (via command-line argument or interactive prompt) and automatically fetch the corresponding xoxc token.
+- **FR-002**: System MUST verify the fetched tokens against the Slack API before writing to config.
+- **FR-003**: System MUST write both tokens to the config file, preserving existing non-auth sections.
+- **FR-004**: System MUST normalize workspace URLs by appending `.slack.com` if not already present.
+
+#### Desktop app token extraction
+
+- **FR-005**: System MUST extract xoxc tokens from the Slack desktop app's LevelDB local storage.
+- **FR-006**: System MUST extract the xoxd cookie (the `d` cookie) from the Slack desktop app's cookie store.
+- **FR-007**: System MUST support the Flatpak Slack data path (`~/.var/app/com.slack.Slack/config/Slack/`).
+- **FR-008**: System MUST support the standard Linux Slack data path (`~/.config/Slack/`).
+- **FR-009**: System MUST auto-detect which Slack installation path is available, preferring the Flatpak path first and falling back to the standard path only if the Flatpak path does not exist.
+- **FR-010**: When multiple workspaces are found, system MUST present the user with a list and let them choose which workspace to configure.
+- **FR-011**: System MUST write the selected workspace's xoxc token and the xoxd cookie to the config file using the existing `write_config` mechanism.
+- **FR-012**: System MUST verify extracted tokens by calling the Slack API (`auth.test`) before writing the config.
+- **FR-013**: System MUST provide a list-only mode that displays discovered workspaces without modifying files.
+- **FR-014**: System MUST fail with a clear, actionable error message when the Slack app's database is locked (app is running), no Slack installation is found, or the database contents are unrecognizable.
 
 ### Key Entities
 
