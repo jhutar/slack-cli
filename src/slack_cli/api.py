@@ -1,5 +1,6 @@
 import logging
 import time
+from urllib.parse import quote
 
 import requests
 
@@ -24,18 +25,19 @@ class SlackAPI:
 
     def call(self, method, params=None):
         url = f"{BASE_URL}/{method}"
-        headers = {"Authorization": f"Bearer {self.xoxc_token}"}
+        xoxd_encoded = quote(self.xoxd_token, safe="")
+        headers = {"Cookie": f"d={xoxd_encoded}"}
         if self.user_agent:
             headers["User-Agent"] = self.user_agent
-        cookies = {"d": self.xoxd_token}
+
+        form_data = dict(params or {})
+        form_data["token"] = self.xoxc_token
 
         logger.debug("API call: %s params=%s", method, params)
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                resp = requests.post(
-                    url, headers=headers, cookies=cookies, data=params or {}
-                )
+                resp = requests.post(url, headers=headers, data=form_data)
                 resp.raise_for_status()
             except requests.RequestException as e:
                 if attempt == MAX_RETRIES:
@@ -45,7 +47,7 @@ class SlackAPI:
                 continue
 
             data = resp.json()
-            logger.debug("API response: %s ok=%s", method, data.get("ok"))
+            logger.debug("API response: %s ok=%s - %s", method, data.get("ok"), data)
 
             if data.get("ok"):
                 return data
