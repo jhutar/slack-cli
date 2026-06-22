@@ -1,4 +1,5 @@
 import os
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -56,3 +57,43 @@ def load_config(config_path=None):
         config["user_agent"] = env_ua
 
     return config
+
+
+def write_config(config_path, auth_updates):
+    file_path = Path(config_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing = {}
+    if file_path.exists():
+        with open(file_path, "rb") as f:
+            existing = tomllib.load(f)
+
+    auth = existing.get("auth", {})
+    auth.update(auth_updates)
+
+    lines = ["[auth]"]
+    for key, value in auth.items():
+        lines.append(f'{key} = "{value}"')
+
+    for section_name in ("logging", "cache"):
+        section = existing.get(section_name)
+        if section:
+            lines.append("")
+            lines.append(f"[{section_name}]")
+            for key, value in section.items():
+                if isinstance(value, str):
+                    lines.append(f'{key} = "{value}"')
+                else:
+                    lines.append(f"{key} = {value}")
+
+    content = "\n".join(lines) + "\n"
+
+    fd, tmp_path = tempfile.mkstemp(dir=file_path.parent, suffix=".tmp")
+    try:
+        os.write(fd, content.encode())
+        os.close(fd)
+        os.replace(tmp_path, file_path)
+    except BaseException:
+        os.close(fd)
+        os.unlink(tmp_path)
+        raise

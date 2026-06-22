@@ -32,15 +32,25 @@ make bootstrap
 The tool uses Slack session tokens (xoxc + xoxd) from your browser.
 These are **not** OAuth app tokens — no Slack app registration required.
 
-### Getting your tokens
+### Quick login (experimental)
+
+You only need the `d` cookie from your browser — the tool fetches the
+xoxc token automatically:
 
 1. Open Slack in your browser and log in
-2. Open Developer Tools (F12) → Network → select some request → Cookies
-3. Copy the `d` cookie value — this is your **xoxd** token (starts with `xoxd-`)
-4. Open Developer Tools (F12) → Console and run: `JSON.parse(localStorage.getItem('localConfig_v2')).teams[Object.keys(JSON.parse(localStorage.getItem('localConfig_v2')).teams)[0]].token`
-5. The output is your **xoxc** token (starts with `xoxc-`)
+2. Open Developer Tools (F12) → Network → select any request → Cookies
+3. Copy the `d` cookie value (starts with `xoxd-`)
+4. Run:
 
-### Configuration
+```bash
+slack-cli login mywork.slack.com --xoxd-token "xoxd-..."
+```
+
+Or omit `--xoxd-token` to be prompted interactively. The command
+fetches the xoxc token, verifies authentication, and writes both
+tokens to `~/.config/slack-cli/config.toml`.
+
+### Manual configuration
 
 **Option A** — Environment variables:
 

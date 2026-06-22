@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from slack_cli import __version__
-from slack_cli.commands import read
+from slack_cli.commands import login, read
 from slack_cli.config import load_config
 from slack_cli.log import setup_logging
 
@@ -40,6 +40,22 @@ def main():
         help="number of follow-up messages (integer) or duration (e.g., 30M, 2H)",
     )
 
+    login_parser = subparsers.add_parser(
+        "login", help="fetch xoxc token and write config (experimental)"
+    )
+    login_parser.add_argument(
+        "workspace_url", metavar="workspace-url",
+        help="Slack workspace URL (e.g., mywork.slack.com)",
+    )
+    login_parser.add_argument(
+        "--xoxd-token", default=None,
+        help="xoxd cookie value; if omitted, reads from config/env or prompts",
+    )
+    login_parser.add_argument(
+        "--user-agent", default=None,
+        help="User-Agent header (for enterprise Slack)",
+    )
+
     args = parser.parse_args()
 
     if args.subcommand is None:
@@ -56,5 +72,7 @@ def main():
         log_file=config.get("log_file") or None,
     )
 
-    if args.subcommand == "read":
+    if args.subcommand == "login":
+        login.run(args, config)
+    elif args.subcommand == "read":
         read.run(args, config)
