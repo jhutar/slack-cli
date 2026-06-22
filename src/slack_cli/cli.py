@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from slack_cli import __version__
-from slack_cli.commands import login, read
+from slack_cli.commands import extract, login, read
 from slack_cli.config import load_config
 from slack_cli.log import setup_logging
 
@@ -40,6 +40,14 @@ def main():
         help="number of follow-up messages (integer) or duration (e.g., 30M, 2H)",
     )
 
+    extract_parser = subparsers.add_parser(
+        "extract", help="extract tokens from Slack desktop app and write config"
+    )
+    extract_parser.add_argument(
+        "--list", action="store_true",
+        help="list available workspaces without modifying config",
+    )
+
     login_parser = subparsers.add_parser(
         "login", help="fetch xoxc token and write config (experimental)"
     )
@@ -72,7 +80,9 @@ def main():
         log_file=config.get("log_file") or None,
     )
 
-    if args.subcommand == "login":
+    if args.subcommand == "extract":
+        extract.run(args, config)
+    elif args.subcommand == "login":
         login.run(args, config)
     elif args.subcommand == "read":
         read.run(args, config)

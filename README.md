@@ -32,6 +32,25 @@ make bootstrap
 The tool uses Slack session tokens (xoxc + xoxd) from your browser.
 These are **not** OAuth app tokens — no Slack app registration required.
 
+### Extract from desktop app
+
+If you have the Slack desktop app installed (Flatpak or standard Linux),
+you can extract tokens directly — no browser needed:
+
+```bash
+# Extract tokens and write config (Slack app must be closed)
+slack-cli extract
+
+# List available workspaces without modifying config
+slack-cli extract --list
+```
+
+The command auto-detects your Slack installation, extracts workspace
+tokens and the session cookie, verifies authentication, and writes
+everything to `~/.config/slack-cli/config.toml`.
+
+**Requirements**: `libleveldb-dev` system package, GNOME Keyring unlocked.
+
 ### Quick login (experimental)
 
 You only need the `d` cookie from your browser — the tool fetches the
