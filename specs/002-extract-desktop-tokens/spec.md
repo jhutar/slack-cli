@@ -38,9 +38,9 @@ A user has the Slack desktop app installed as a Flatpak and wants to automatical
 
 **Acceptance Scenarios**:
 
-1. **Given** the Slack desktop app (Flatpak) is closed and its local storage contains valid tokens, **When** the user runs the extract command, **Then** tokens for all workspaces are discovered, the user selects a workspace, and the config file is written with the xoxc token and xoxd cookie for that workspace.
-2. **Given** the config file already exists with tokens for a different workspace, **When** the user runs the extract command, **Then** the existing config is preserved and updated with the new tokens (auth section is replaced, other sections remain intact).
-3. **Given** the Slack app is running and the LevelDB database is locked, **When** the user runs the extract command, **Then** the tool reports a clear error message telling the user to quit Slack first.
+1. **Given** the Slack desktop app (Flatpak) is closed and its local storage contains valid tokens, **When** the user runs the `slack-cli extract` command, **Then** tokens for all workspaces are discovered, the user selects a workspace, and the config file is written with the xoxc token and xoxd cookie for that workspace.
+2. **Given** the config file already exists with tokens for a different workspace, **When** the user runs the `slack-cli extract` command, **Then** the existing config is preserved and updated with the new tokens (auth section is replaced, other sections remain intact).
+3. **Given** the Slack app is running and the LevelDB database is locked, **When** the user runs the `slack-cli extract` command, **Then** the tool reports a clear error message telling the user to quit Slack first.
 
 ---
 
@@ -50,12 +50,12 @@ A user has the Slack desktop app installed via the standard (non-Flatpak) method
 
 **Why this priority**: Supports the traditional Linux installation path. Same functionality as P1 but for the conventional data directory.
 
-**Independent Test**: Can be tested by running the extract command on a system with a standard Slack installation at `~/.config/Slack/` and verifying correct token extraction and config writing.
+**Independent Test**: Can be tested by running the `slack-cli extract` command on a system with a standard Slack installation at `~/.config/Slack/` and verifying correct token extraction and config writing.
 
 **Acceptance Scenarios**:
 
-1. **Given** a standard Linux Slack install with data at `~/.config/Slack/Local Storage/leveldb`, **When** the user runs the extract command, **Then** tokens are extracted and the config file is updated identically to the Flatpak flow.
-2. **Given** neither Flatpak nor standard Slack data directories exist, **When** the user runs the extract command, **Then** the tool prints a clear error explaining that no Slack installation was found and lists the paths it searched.
+1. **Given** a standard Linux Slack install with data at `~/.config/Slack/Local Storage/leveldb`, **When** the user runs the `slack-cli extract` command, **Then** tokens are extracted and the config file is updated identically to the Flatpak flow.
+2. **Given** neither Flatpak nor standard Slack data directories exist, **When** the user runs the `slack-cli extract` command, **Then** the tool prints a clear error explaining that no Slack installation was found and lists the paths it searched.
 
 ---
 
@@ -69,7 +69,7 @@ A user wants to see which workspaces are available in their Slack app without mo
 
 **Acceptance Scenarios**:
 
-1. **Given** the Slack desktop app is closed and has multiple workspaces configured, **When** the user runs the extract command with a list-only option, **Then** all workspace names and URLs are printed to stdout without modifying any files.
+1. **Given** the Slack desktop app is closed and has multiple workspaces configured, **When** the user runs the `slack-cli extract` command with a list-only option, **Then** all workspace names and URLs are printed to stdout without modifying any files.
 
 ---
 
@@ -98,9 +98,9 @@ A user wants to see which workspaces are available in their Slack app without mo
 - **FR-007**: System MUST support the Flatpak Slack data path (`~/.var/app/com.slack.Slack/config/Slack/`).
 - **FR-008**: System MUST support the standard Linux Slack data path (`~/.config/Slack/`).
 - **FR-009**: System MUST auto-detect which Slack installation path is available, preferring the Flatpak path first and falling back to the standard path only if the Flatpak path does not exist.
-- **FR-010**: When multiple workspaces are found, system MUST present the user with a list and let them choose which workspace to configure.
+- **FR-010**: When multiple workspaces are found, system MUST present the user with a list and let them choose which workspace to configure. When exactly one workspace is found, system MUST select it automatically without prompting.
 - **FR-011**: System MUST write the selected workspace's xoxc token and the xoxd cookie to the config file using the existing `write_config` mechanism.
-- **FR-012**: System MUST verify extracted tokens by calling the Slack API (`auth.test`) before writing the config.
+- **FR-012**: System MUST verify extracted tokens by calling the Slack API (`auth.test`) before writing the config. Verification is mandatory — if the network is unavailable, the command MUST fail with an actionable error rather than writing unverified tokens.
 - **FR-013**: System MUST provide a list-only mode that displays discovered workspaces without modifying files.
 - **FR-014**: System MUST fail with a clear, actionable error message when the Slack app's database is locked (app is running), no Slack installation is found, or the database contents are unrecognizable.
 
@@ -118,6 +118,14 @@ A user wants to see which workspaces are available in their Slack app without mo
 - **SC-002**: Extracted tokens successfully authenticate against the Slack API on first use in 95%+ of cases where the Slack app has a valid session.
 - **SC-003**: Error messages for all failure conditions (app locked, no install found, expired session) are actionable — each tells the user what to do next.
 - **SC-004**: The command works identically for both Flatpak and standard Linux Slack installations.
+
+## Clarifications
+
+### Session 2026-06-22
+
+- Q: Should the desktop app token extraction be a new subcommand or extend the existing `login` command? → A: New subcommand `slack-cli extract`, separate from `login`.
+- Q: When only one workspace is found, should the tool auto-select it or still prompt? → A: Auto-select and skip the prompt when exactly one workspace is found.
+- Q: Should token verification via `auth.test` be mandatory or skippable when offline? → A: Mandatory — always verify, fail if network is unavailable.
 
 ## Assumptions
 
