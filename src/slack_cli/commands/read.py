@@ -178,16 +178,30 @@ def _fetch_messages(api, link, args):
         "channel": link.channel_id,
         "oldest": link.message_ts,
         "inclusive": "true",
+        "limit": "200",
     }
 
-    if after["type"] == "count":
-        params["limit"] = str(after["count"] + 1)
-    else:
+    if after["type"] == "duration":
         latest_ts = float(link.message_ts) + after["seconds"]
         params["latest"] = str(latest_ts)
 
-    resp = api.call("conversations.history", params)
-    follow_ups = resp.get("messages", [])
+    wanted = after["count"] + 1 if after["type"] == "count" else None
+
+    follow_ups = []
+    while True:
+        resp = api.call("conversations.history", params)
+        batch = resp.get("messages", [])
+        follow_ups.extend(batch)
+
+        if wanted and len(follow_ups) >= wanted:
+            follow_ups = follow_ups[:wanted]
+            break
+
+        cursor = resp.get("response_metadata", {}).get("next_cursor", "")
+        if not cursor:
+            break
+        params["cursor"] = cursor
+
     follow_ups.sort(key=lambda m: float(m.get("ts", "0")))
 
     for fu in follow_ups:
