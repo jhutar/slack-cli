@@ -18,7 +18,7 @@ to an AI agent or another tool.
 Requires Python 3.11+.
 
 ```bash
-pip install -e .
+uv sync
 ```
 
 Or for development:
@@ -32,7 +32,7 @@ make bootstrap
 The tool uses Slack session tokens (xoxc + xoxd) from your browser.
 These are **not** OAuth app tokens — no Slack app registration required.
 
-### Extract from desktop app
+### Extract from desktop app (experimental)
 
 If you have the Slack desktop app installed (Flatpak or standard Linux),
 you can extract tokens directly — no browser needed:
@@ -71,6 +71,19 @@ tokens to `~/.config/slack-cli/config.toml`.
 
 ### Manual configuration
 
+To get the tokens from your browser:
+
+1. Open Slack in your browser and log in
+2. Open Developer Tools (F12) → Network → select any request → Cookies
+3. Copy the `d` cookie value (starts with `xoxd-`)
+4. Go to the Console tab and run:
+   ```js
+   JSON.parse(localStorage.getItem('localConfig_v2')).teams[Object.keys(JSON.parse(localStorage.getItem('localConfig_v2')).teams)[0]].token
+   ```
+5. Copy the `xoxc-` token from the output
+
+Then configure the tokens using one of the options below.
+
 **Option A** — Environment variables:
 
 ```bash
@@ -108,9 +121,6 @@ slack-cli read --after 10 'https://mywork.slack.com/archives/C01234/p12345678901
 
 # Fetch a message plus 2 hours of follow-up
 slack-cli read --after 2H 'https://mywork.slack.com/archives/C01234/p1234567890123456'
-
-# Pipe to an AI agent
-slack-cli read 'https://mywork.slack.com/archives/C01234/p1234567890123456' | ai-tool
 
 # Debug logging to stderr
 slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234567890123456'
