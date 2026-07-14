@@ -37,7 +37,7 @@ class SlackAPI:
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                resp = requests.post(url, headers=headers, data=form_data)
+                resp = requests.post(url, headers=headers, data=form_data, timeout=30)
                 resp.raise_for_status()
             except requests.RequestException as e:
                 if attempt == MAX_RETRIES:

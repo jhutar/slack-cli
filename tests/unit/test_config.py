@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from slack_cli.config import load_config
@@ -7,9 +5,7 @@ from slack_cli.config import load_config
 
 def test_load_from_toml(tmp_path):
     cfg_file = tmp_path / "config.toml"
-    cfg_file.write_text(
-        '[auth]\nxoxc_token = "xoxc-test"\nxoxd_token = "xoxd-test"\n'
-    )
+    cfg_file.write_text('[auth]\nxoxc_token = "xoxc-test"\nxoxd_token = "xoxd-test"\n')
     config = load_config(str(cfg_file))
     assert config["xoxc_token"] == "xoxc-test"
     assert config["xoxd_token"] == "xoxd-test"

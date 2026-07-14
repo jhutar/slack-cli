@@ -29,8 +29,8 @@ def parse_slack_link(url):
     match = SLACK_LINK_RE.match(path_url)
     if not match:
         raise ValueError(
-            f"Invalid Slack link format. Expected: "
-            f"https://<workspace>.slack.com/archives/<channel>/p<timestamp>"
+            "Invalid Slack link format. Expected: "
+            "https://<workspace>.slack.com/archives/<channel>/p<timestamp>"
         )
 
     workspace = match.group(1)

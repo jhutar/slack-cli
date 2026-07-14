@@ -1,6 +1,5 @@
 """Extract authentication tokens and cookie from the Slack desktop app's local storage."""
 
-import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -26,9 +25,7 @@ def find_slack_installation(search_paths=None):
             }
 
     searched = ", ".join(str(p) for p, _ in search_paths)
-    raise SystemExit(
-        f"Error: No Slack installation found. Searched: {searched}"
-    )
+    raise SystemExit(f"Error: No Slack installation found. Searched: {searched}")
 
 
 def extract_tokens(leveldb_path):
@@ -39,12 +36,9 @@ def extract_tokens(leveldb_path):
     except plyvel.Error as e:
         if "lock" in str(e).lower():
             raise SystemExit(
-                "Error: Slack's database is locked. "
-                "Quit the Slack app and try again."
+                "Error: Slack's database is locked. Quit the Slack app and try again."
             ) from e
-        raise SystemExit(
-            f"Error: Could not open Slack's local storage: {e}"
-        ) from e
+        raise SystemExit(f"Error: Could not open Slack's local storage: {e}") from e
 
     try:
         cfg_value = None
@@ -63,11 +57,13 @@ def extract_tokens(leveldb_path):
 
         tokens = []
         for team in data["teams"].values():
-            tokens.append({
-                "url": team["url"],
-                "name": team["name"],
-                "token": team["token"],
-            })
+            tokens.append(
+                {
+                    "url": team["url"],
+                    "name": team["name"],
+                    "token": team["token"],
+                }
+            )
         return tokens
     finally:
         db.close()
@@ -142,7 +138,7 @@ def _decrypt_v11_cookie(encrypted_value, password):
     ciphertext = encrypted_value[19:]
 
     kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA1(),
+        algorithm=hashes.SHA1(),  # nosec B303 — Chromium's cookie encryption requires SHA1
         length=16,
         salt=b"saltysalt",
         iterations=1,

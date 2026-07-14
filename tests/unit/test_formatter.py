@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 from slack_cli.formatter import format_messages
 
 
-def _msg(text="hello", user_name="alice", ts="1718972400.000000", replies=None, files=None):
+def _msg(
+    text="hello", user_name="alice", ts="1718972400.000000", replies=None, files=None
+):
     return {
         "text": text,
         "user_name": user_name,
@@ -76,6 +78,6 @@ def test_multi_message_with_inline_thread():
     assert "#### 3.2. @eve" in result
     assert "### 4. @frank" in result
     lines = result.split("\n")
-    thread_idx = next(i for i, l in enumerate(lines) if "3.2. @eve" in l)
-    msg4_idx = next(i for i, l in enumerate(lines) if "4. @frank" in l)
+    thread_idx = next(i for i, line in enumerate(lines) if "3.2. @eve" in line)
+    msg4_idx = next(i for i, line in enumerate(lines) if "4. @frank" in line)
     assert thread_idx < msg4_idx

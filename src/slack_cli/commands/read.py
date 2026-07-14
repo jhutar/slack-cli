@@ -71,10 +71,19 @@ def run(args, config):
                     api, reply_user_id, users_cache, users_cache_path
                 )
             replies.append(
-                _build_message(reply_raw, user_map, channel_map, api, channels_cache, channels_cache_path)
+                _build_message(
+                    reply_raw,
+                    user_map,
+                    channel_map,
+                    api,
+                    channels_cache,
+                    channels_cache_path,
+                )
             )
 
-        msg = _build_message(raw, user_map, channel_map, api, channels_cache, channels_cache_path)
+        msg = _build_message(
+            raw, user_map, channel_map, api, channels_cache, channels_cache_path
+        )
         msg["replies"] = replies
         messages.append(msg)
 
@@ -158,6 +167,27 @@ def _fetch_messages(api, link, args):
     )
     msgs = resp.get("messages", [])
     if not msgs:
+        logger.debug("Message not in channel history, trying as thread reply")
+        try:
+            reply_msgs = api.call_paginated(
+                "conversations.replies",
+                {"channel": link.channel_id, "ts": link.message_ts, "limit": "200"},
+                "messages",
+            )
+        except SlackAPIError:
+            reply_msgs = []
+        if reply_msgs:
+            thread_ts = reply_msgs[0].get("thread_ts")
+            if thread_ts and thread_ts != link.message_ts:
+                logger.debug("Found thread parent %s, fetching full thread", thread_ts)
+                reply_msgs = api.call_paginated(
+                    "conversations.replies",
+                    {"channel": link.channel_id, "ts": thread_ts, "limit": "200"},
+                    "messages",
+                )
+            parent = reply_msgs[0]
+            parent["_replies"] = reply_msgs[1:]
+            return [parent]
         print("Error: Message not found.", file=sys.stderr)
         sys.exit(3)
 
@@ -217,7 +247,9 @@ def _fetch_messages(api, link, args):
     return follow_ups
 
 
-def _build_message(raw, user_map, channel_map, api, channels_cache, channels_cache_path):
+def _build_message(
+    raw, user_map, channel_map, api, channels_cache, channels_cache_path
+):
     user_id = raw.get("user", "unknown")
     user_name = user_map.get(user_id, user_id)
 
@@ -230,11 +262,13 @@ def _build_message(raw, user_map, channel_map, api, channels_cache, channels_cac
 
     files = []
     for f in raw.get("files", []):
-        files.append({
-            "name": f.get("name", f.get("title", "unknown")),
-            "filetype": f.get("filetype", ""),
-            "url": f.get("url_private", None),
-        })
+        files.append(
+            {
+                "name": f.get("name", f.get("title", "unknown")),
+                "filetype": f.get("filetype", ""),
+                "url": f.get("url_private", None),
+            }
+        )
 
     return {
         "text": converted_text,

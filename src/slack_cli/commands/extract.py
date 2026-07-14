@@ -4,7 +4,11 @@ import sys
 
 from slack_cli.api import SlackAPI
 from slack_cli.config import DEFAULT_CONFIG_PATH, write_config
-from slack_cli.slack_tokens import decrypt_cookie, extract_tokens, find_slack_installation
+from slack_cli.slack_tokens import (
+    decrypt_cookie,
+    extract_tokens,
+    find_slack_installation,
+)
 
 
 def run(args, config):
@@ -65,6 +69,10 @@ def _select_workspace(tokens):
             idx = int(choice)
             if 1 <= idx <= len(tokens):
                 return tokens[idx - 1]
-            print(f"Please enter a number between 1 and {len(tokens)}.", file=sys.stderr)
+            print(
+                f"Please enter a number between 1 and {len(tokens)}.", file=sys.stderr
+            )
         except (ValueError, EOFError):
-            print(f"Please enter a number between 1 and {len(tokens)}.", file=sys.stderr)
+            print(
+                f"Please enter a number between 1 and {len(tokens)}.", file=sys.stderr
+            )

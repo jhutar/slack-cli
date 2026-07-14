@@ -28,7 +28,7 @@ def load_cache(path, ttl=DEFAULT_TTL):
     if updated_at is None:
         return None
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         cache_time = datetime.fromisoformat(updated_at).timestamp()

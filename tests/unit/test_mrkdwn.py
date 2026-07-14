@@ -23,7 +23,10 @@ def test_fenced_code_block_unchanged():
 
 
 def test_link_with_display_text():
-    assert convert("<https://example.com|Click here>") == "[Click here](https://example.com)"
+    assert (
+        convert("<https://example.com|Click here>")
+        == "[Click here](https://example.com)"
+    )
 
 
 def test_bare_link():

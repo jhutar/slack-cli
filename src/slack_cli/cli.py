@@ -12,7 +12,9 @@ def main():
         prog="slack-cli",
         description="CLI tool to translate Slack links to readable message content",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     parser.add_argument(
         "--config",
         "-c",
@@ -32,7 +34,9 @@ def main():
     read_parser = subparsers.add_parser(
         "read", help="fetch and display Slack messages from a link"
     )
-    read_parser.add_argument("slack_link", metavar="slack-link", help="Slack message URL")
+    read_parser.add_argument(
+        "slack_link", metavar="slack-link", help="Slack message URL"
+    )
     read_parser.add_argument(
         "--after",
         "-a",
@@ -44,7 +48,8 @@ def main():
         "extract", help="extract tokens from Slack desktop app and write config"
     )
     extract_parser.add_argument(
-        "--list", action="store_true",
+        "--list",
+        action="store_true",
         help="list available workspaces without modifying config",
     )
 
@@ -52,15 +57,18 @@ def main():
         "login", help="fetch xoxc token and write config (experimental)"
     )
     login_parser.add_argument(
-        "workspace_url", metavar="workspace-url",
+        "workspace_url",
+        metavar="workspace-url",
         help="Slack workspace URL (e.g., mywork.slack.com)",
     )
     login_parser.add_argument(
-        "--xoxd-token", default=None,
+        "--xoxd-token",
+        default=None,
         help="xoxd cookie value; if omitted, reads from config/env or prompts",
     )
     login_parser.add_argument(
-        "--user-agent", default=None,
+        "--user-agent",
+        default=None,
         help="User-Agent header (for enterprise Slack)",
     )
 
