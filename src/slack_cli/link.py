@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
 SLACK_LINK_RE = re.compile(
-    r"^https://([a-zA-Z0-9][a-zA-Z0-9-]*)\.slack\.com/archives/([CDGW][A-Z0-9]+)/p(\d+)$"
+    r"^https://([a-zA-Z0-9][a-zA-Z0-9.-]*)\.slack\.com/archives/([CDGW][A-Z0-9]+)/p(\d+)$"
 )
 
 

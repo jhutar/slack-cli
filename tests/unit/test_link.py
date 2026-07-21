@@ -67,3 +67,12 @@ def test_workspace_with_hyphens():
         "https://my-company.slack.com/archives/C01234567/p1234567890123456"
     )
     assert link.workspace == "my-company"
+
+
+def test_enterprise_subdomain():
+    link = parse_slack_link(
+        "https://mywork.enterprise.slack.com/archives/C01234567/p1234567890123456"
+    )
+    assert link.workspace == "mywork.enterprise"
+    assert link.channel_id == "C01234567"
+    assert link.message_ts == "1234567890.123456"
