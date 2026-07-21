@@ -222,10 +222,17 @@ class TestReplyLink:
                     {
                         "messages": [
                             {
+                                "user": "U123",
+                                "text": "Thread parent",
+                                "ts": "1718972400.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                            {
                                 "user": "U456",
                                 "text": "Just this reply",
                                 "ts": "1718972401.000000",
-                            }
+                                "thread_ts": "1718972400.000000",
+                            },
                         ]
                     }
                 ),

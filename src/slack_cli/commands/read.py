@@ -125,21 +125,19 @@ def _fetch_messages(api, link, args):
         sys.exit(1)
 
     if link.is_thread and link.is_reply:
-        resp = api.call(
-            "conversations.history",
-            {
-                "channel": link.channel_id,
-                "oldest": link.message_ts,
-                "latest": link.message_ts,
-                "inclusive": "true",
-                "limit": "1",
-            },
+        thread_msgs = api.call_paginated(
+            "conversations.replies",
+            {"channel": link.channel_id, "ts": link.thread_ts, "limit": "200"},
+            "messages",
         )
-        msgs = resp.get("messages", [])
-        if not msgs:
+        if not thread_msgs:
             print("Error: Message not found.", file=sys.stderr)
             sys.exit(3)
-        return msgs
+        reply = [m for m in thread_msgs if m.get("ts") == link.message_ts]
+        if not reply:
+            print("Error: Message not found.", file=sys.stderr)
+            sys.exit(3)
+        return reply
 
     if link.is_thread:
         thread_ts = link.thread_ts or link.message_ts
