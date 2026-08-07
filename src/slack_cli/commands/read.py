@@ -117,9 +117,10 @@ def _parse_after(value):
 def _fetch_messages(api, link, args):
     after = _parse_after(getattr(args, "after", None))
 
-    if after and link.is_thread:
+    if after and link.is_thread and not link.is_reply:
         print(
-            "Error: --after is only supported for channel messages, not thread links.",
+            "Error: --after is only supported for channel messages and thread "
+            "replies, not full thread links.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -133,11 +134,26 @@ def _fetch_messages(api, link, args):
         if not thread_msgs:
             print("Error: Message not found.", file=sys.stderr)
             sys.exit(3)
-        reply = [m for m in thread_msgs if m.get("ts") == link.message_ts]
-        if not reply:
+        reply_idx = next(
+            (i for i, m in enumerate(thread_msgs) if m.get("ts") == link.message_ts),
+            None,
+        )
+        if reply_idx is None:
             print("Error: Message not found.", file=sys.stderr)
             sys.exit(3)
-        return reply
+        reply = [thread_msgs[reply_idx]]
+
+        if not after:
+            return reply
+
+        later = thread_msgs[reply_idx + 1 :]
+        if after["type"] == "duration":
+            latest_ts = float(link.message_ts) + after["seconds"]
+            later = [m for m in later if float(m.get("ts", "0")) <= latest_ts]
+        else:
+            later = later[: after["count"]]
+
+        return reply + later
 
     if link.is_thread:
         thread_ts = link.thread_ts or link.message_ts

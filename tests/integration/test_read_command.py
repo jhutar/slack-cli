@@ -413,6 +413,66 @@ class TestAfterWithThread:
         err = capsys.readouterr().err
         assert "--after" in err
 
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_after_with_reply_link(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post(
+            [
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Thread parent",
+                                "ts": "1718972400.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                            {
+                                "user": "U456",
+                                "text": "Just this reply",
+                                "ts": "1718972401.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                            {
+                                "user": "U789",
+                                "text": "Next reply",
+                                "ts": "1718972402.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "bob",
+                            "profile": {"display_name": "Bob", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "carol",
+                            "profile": {"display_name": "Carol", "real_name": ""},
+                        }
+                    }
+                ),
+            ]
+        )
+
+        link = (
+            "https://test.slack.com/archives/C01234567/p1718972401000000"
+            "?thread_ts=1718972400.000000&cid=C01234567"
+        )
+        run(_make_args(link, after="1"), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Just this reply" in out
+        assert "Next reply" in out
+        assert "Thread parent" not in out
+
 
 class TestMissingTokens:
     def test_missing_xoxc(self, capsys):
