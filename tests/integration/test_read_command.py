@@ -85,6 +85,137 @@ class TestChannelMessage:
     @patch("slack_cli.cache.load_cache", return_value=None)
     @patch("slack_cli.cache.save_cache")
     @patch("requests.post")
+    def test_mention_non_author(self, mock_post, mock_save, mock_load, capsys):
+        # Author U123 mentions U456, who has NOT posted in this message.
+        mock_post.side_effect = _mock_post(
+            [
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Hi <@U456>",
+                                "ts": "1718972400.000000",
+                                "reply_count": 0,
+                            }
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "alice",
+                            "profile": {"display_name": "Alice", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "bob",
+                            "profile": {"display_name": "Bob", "real_name": ""},
+                        }
+                    }
+                ),
+            ]
+        )
+
+        link = "https://test.slack.com/archives/C01234567/p1718972400000000"
+        run(_make_args(link), _make_config())
+
+        out = capsys.readouterr().out
+        assert "@Alice" in out
+        assert "@Bob" in out
+        assert "@U456" not in out
+
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_mention_with_thread(self, mock_post, mock_save, mock_load, capsys):
+        # Parent mentions U000, who is NOT an author of any message here.
+        mock_post.side_effect = _mock_post(
+            [
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Parent <@U000>",
+                                "ts": "1718972400.000000",
+                                "reply_count": 2,
+                            }
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Parent",
+                                "ts": "1718972400.000000",
+                            },
+                            {
+                                "user": "U456",
+                                "text": "Reply 1",
+                                "ts": "1718972401.000000",
+                            },
+                            {
+                                "user": "U789",
+                                "text": "Reply 2",
+                                "ts": "1718972402.000000",
+                            },
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "alice",
+                            "profile": {"display_name": "Alice", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "bob",
+                            "profile": {"display_name": "Bob", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "carol",
+                            "profile": {"display_name": "Carol", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "dave",
+                            "profile": {"display_name": "Dave", "real_name": ""},
+                        }
+                    }
+                ),
+            ]
+        )
+
+        link = "https://test.slack.com/archives/C01234567/p1718972400000000"
+        run(_make_args(link), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Parent @Dave" in out
+        assert "@Alice" in out
+        assert "@Bob" in out
+        assert "@Carol" in out
+        assert "@U000" not in out
+
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
     def test_message_with_thread(self, mock_post, mock_save, mock_load, capsys):
         mock_post.side_effect = _mock_post(
             [

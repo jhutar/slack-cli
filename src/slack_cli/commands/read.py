@@ -76,13 +76,22 @@ def run(args, config):
                     user_map,
                     channel_map,
                     api,
+                    users_cache,
+                    users_cache_path,
                     channels_cache,
                     channels_cache_path,
                 )
             )
 
         msg = _build_message(
-            raw, user_map, channel_map, api, channels_cache, channels_cache_path
+            raw,
+            user_map,
+            channel_map,
+            api,
+            users_cache,
+            users_cache_path,
+            channels_cache,
+            channels_cache_path,
         )
         msg["replies"] = replies
         messages.append(msg)
@@ -262,12 +271,20 @@ def _fetch_messages(api, link, args):
 
 
 def _build_message(
-    raw, user_map, channel_map, api, channels_cache, channels_cache_path
+    raw,
+    user_map,
+    channel_map,
+    api,
+    users_cache,
+    users_cache_path,
+    channels_cache,
+    channels_cache_path,
 ):
     user_id = raw.get("user", "unknown")
     user_name = user_map.get(user_id, user_id)
 
     text = raw.get("text", "")
+    _collect_user_refs(text, user_map, api, users_cache, users_cache_path)
     _collect_channel_refs(text, channel_map, api, channels_cache, channels_cache_path)
     converted_text = convert_mrkdwn(text, user_map=user_map, channel_map=channel_map)
 
@@ -292,6 +309,14 @@ def _build_message(
         "datetime": dt,
         "files": files,
     }
+
+
+def _collect_user_refs(text, user_map, api, users_cache, users_cache_path):
+    """Resolve any @-mentioned users found in text into user_map."""
+    for m in re.finditer(r"<@(U[A-Z0-9]+)>", text):
+        uid = m.group(1)
+        if uid not in user_map:
+            user_map[uid] = resolve_user(api, uid, users_cache, users_cache_path)
 
 
 def _collect_channel_refs(text, channel_map, api, channels_cache, channels_cache_path):
