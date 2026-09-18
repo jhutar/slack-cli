@@ -12,8 +12,6 @@ to an AI agent or another tool.
 - DM and group DM support
 - Converts Slack's mrkdwn format to standard Markdown
 - Resolves user mentions and channel references to display names
-- Lists mentions and new DMs from a time window (`activity`) — an "Activity"
-  section overview for morning triage
 
 ## Setup
 
@@ -126,32 +124,7 @@ slack-cli read --after 2H 'https://mywork.slack.com/archives/C01234/p12345678901
 
 # Debug logging to stderr
 slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234567890123456'
-
-# Morning triage: mentions and DMs from the last 24 hours
-slack-cli activity
-
-# Widen the window
-slack-cli activity --since 8H
 ```
-
-### Activity
-
-`slack-cli activity` lists what needs your attention since a time window
-(default: last 24 hours, `--since 30M`/`8H`):
-
-- **Mentions** — messages that mention you in channels and threads
-  (`[thread]` marks ones inside a thread). Each entry has a permalink you
-  can feed straight to `slack-cli read`.
-- **Direct messages** — DMs and group DMs whose latest message is from
-  someone else in the window (i.e., waiting on you), with a count, the
-  unread count, the latest message's link, and a snippet. Scans all your
-  DMs, takes about a minute for a few hundred conversations.
-
-Good for agent workflows: run `activity`, then `read` each link and summarize.
-
-Note: on enterprise workspaces, `conversations.list` is restricted, so the
-list covers mentions (channels + threads) and DMs — not generic "new
-activity in channels I belong to".
 
 ## Related Projects and Resources
 
