@@ -37,11 +37,17 @@ def main():
     read_parser.add_argument(
         "slack_link", metavar="slack-link", help="Slack message URL"
     )
-    read_parser.add_argument(
+    after_group = read_parser.add_mutually_exclusive_group()
+    after_group.add_argument(
         "--after",
         "-a",
         default=None,
         help="number of follow-up messages (integer) or duration (e.g., 30M, 2H)",
+    )
+    after_group.add_argument(
+        "--after-all",
+        action="store_true",
+        help="include all messages after the given message",
     )
 
     activity_parser = subparsers.add_parser(

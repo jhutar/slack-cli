@@ -125,11 +125,13 @@ def _parse_after(value):
 
 def _fetch_messages(api, link, args):
     after = _parse_after(getattr(args, "after", None))
+    if after is None and getattr(args, "after_all", False):
+        after = {"type": "all"}
 
     if after and link.is_thread and not link.is_reply:
         print(
-            "Error: --after is only supported for channel messages and thread "
-            "replies, not full thread links.",
+            "Error: --after/--after-all is only supported for channel messages "
+            "and thread replies, not full thread links.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -159,7 +161,7 @@ def _fetch_messages(api, link, args):
         if after["type"] == "duration":
             latest_ts = float(link.message_ts) + after["seconds"]
             later = [m for m in later if float(m.get("ts", "0")) <= latest_ts]
-        else:
+        elif after["type"] == "count":
             later = later[: after["count"]]
 
         return reply + later

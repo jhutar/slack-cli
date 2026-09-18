@@ -15,8 +15,8 @@ def _make_config():
     }
 
 
-def _make_args(link, after=None):
-    return argparse.Namespace(slack_link=link, after=after)
+def _make_args(link, after=None, after_all=False):
+    return argparse.Namespace(slack_link=link, after=after, after_all=after_all)
 
 
 def _slack_ok(data):
@@ -602,6 +602,163 @@ class TestAfterWithThread:
         out = capsys.readouterr().out
         assert "Just this reply" in out
         assert "Next reply" in out
+        assert "Thread parent" not in out
+
+
+class TestAfterAll:
+    def test_after_all_with_thread_link_error(self, capsys):
+        link = (
+            "https://test.slack.com/archives/C01234567/p1718972400000000"
+            "?thread_ts=1718972400.000000&cid=C01234567"
+        )
+        with pytest.raises(SystemExit) as exc:
+            run(_make_args(link, after_all=True), _make_config())
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "--after-all" in err
+
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_after_all(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post(
+            [
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Original",
+                                "ts": "1718972400.000000",
+                                "reply_count": 0,
+                            }
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Original",
+                                "ts": "1718972400.000000",
+                                "reply_count": 0,
+                            },
+                            {
+                                "user": "U456",
+                                "text": "Follow up 1",
+                                "ts": "1718972401.000000",
+                                "reply_count": 0,
+                            },
+                            {
+                                "user": "U789",
+                                "text": "Follow up 2",
+                                "ts": "1718972402.000000",
+                                "reply_count": 0,
+                            },
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "alice",
+                            "profile": {"display_name": "Alice", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "bob",
+                            "profile": {"display_name": "Bob", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "carol",
+                            "profile": {"display_name": "Carol", "real_name": ""},
+                        }
+                    }
+                ),
+            ]
+        )
+
+        link = "https://test.slack.com/archives/C01234567/p1718972400000000"
+        run(_make_args(link, after_all=True), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Original" in out
+        assert "Follow up 1" in out
+        assert "Follow up 2" in out
+
+    @patch("slack_cli.cache.load_cache", return_value=None)
+    @patch("slack_cli.cache.save_cache")
+    @patch("requests.post")
+    def test_after_all_with_reply_link(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect = _mock_post(
+            [
+                _slack_ok(
+                    {
+                        "messages": [
+                            {
+                                "user": "U123",
+                                "text": "Thread parent",
+                                "ts": "1718972400.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                            {
+                                "user": "U456",
+                                "text": "Just this reply",
+                                "ts": "1718972401.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                            {
+                                "user": "U789",
+                                "text": "Next reply",
+                                "ts": "1718972402.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                            {
+                                "user": "U789",
+                                "text": "Last reply",
+                                "ts": "1718972403.000000",
+                                "thread_ts": "1718972400.000000",
+                            },
+                        ]
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "bob",
+                            "profile": {"display_name": "Bob", "real_name": ""},
+                        }
+                    }
+                ),
+                _slack_ok(
+                    {
+                        "user": {
+                            "name": "carol",
+                            "profile": {"display_name": "Carol", "real_name": ""},
+                        }
+                    }
+                ),
+            ]
+        )
+
+        link = (
+            "https://test.slack.com/archives/C01234567/p1718972401000000"
+            "?thread_ts=1718972400.000000&cid=C01234567"
+        )
+        run(_make_args(link, after_all=True), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Just this reply" in out
+        assert "Next reply" in out
+        assert "Last reply" in out
         assert "Thread parent" not in out
 
 

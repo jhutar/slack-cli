@@ -8,7 +8,7 @@ to an AI agent or another tool.
 
 - Fetch a single message (with its thread if it has replies)
 - Fetch an entire thread by link
-- Fetch follow-up messages by count (`--after 5`) or duration (`--after 2H`)
+- Fetch follow-up messages by count (`--after 5`), duration (`--after 2H`) or all (`--after-all`)
 - DM and group DM support
 - Converts Slack's mrkdwn format to standard Markdown
 - Resolves user mentions and channel references to display names
@@ -123,6 +123,9 @@ slack-cli read --after 10 'https://mywork.slack.com/archives/C01234/p12345678901
 
 # Fetch a message plus 2 hours of follow-up
 slack-cli read --after 2H 'https://mywork.slack.com/archives/C01234/p1234567890123456'
+
+# Fetch a message plus everything after it (e.g., after a link from `slack-cli activity`)
+slack-cli read --after-all 'https://mywork.slack.com/archives/C01234/p1234567890123456'
 
 # Debug logging to stderr
 slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234567890123456'
