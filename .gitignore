@@ -12,3 +12,6 @@ build/
 .ruff_cache/
 *.egg
 .venv/
+
+# local browser capture files
+*.har

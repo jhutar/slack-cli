@@ -27,6 +27,16 @@ def test_link_with_thread_ts():
     assert link.thread_ts == "1234567890.123456"
 
 
+def test_link_with_dotless_thread_ts():
+    link = parse_slack_link(
+        "https://mywork.slack.com/archives/C01234567/p1234567890123456"
+        "?thread_ts=1234567890123456&cid=C01234567"
+    )
+    assert link.is_thread is True
+    assert link.is_reply is False
+    assert link.thread_ts == "1234567890.123456"
+
+
 def test_link_with_reply():
     link = parse_slack_link(
         "https://mywork.slack.com/archives/C01234567/p1111111111222222"

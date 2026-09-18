@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from slack_cli import __version__
-from slack_cli.commands import extract, login, read
+from slack_cli.commands import activity, extract, login, read
 from slack_cli.config import load_config
 from slack_cli.log import setup_logging
 
@@ -42,6 +42,10 @@ def main():
         "-a",
         default=None,
         help="number of follow-up messages (integer) or duration (e.g., 30M, 2H)",
+    )
+
+    subparsers.add_parser(
+        "activity", help="list unread mentions, threads and DMs needing a response"
     )
 
     extract_parser = subparsers.add_parser(
@@ -94,3 +98,5 @@ def main():
         login.run(args, config)
     elif args.subcommand == "read":
         read.run(args, config)
+    elif args.subcommand == "activity":
+        activity.run(args, config)

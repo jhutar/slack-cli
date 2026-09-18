@@ -12,6 +12,8 @@ to an AI agent or another tool.
 - DM and group DM support
 - Converts Slack's mrkdwn format to standard Markdown
 - Resolves user mentions and channel references to display names
+- Lists unread mentions, threads and DMs needing a response (`activity`) —
+  the same feed as Slack's Activity panel
 
 ## Setup
 
@@ -124,7 +126,23 @@ slack-cli read --after 2H 'https://mywork.slack.com/archives/C01234/p12345678901
 
 # Debug logging to stderr
 slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234567890123456'
+
+# Morning triage: everything unread that needs a response
+slack-cli activity
 ```
+
+### Activity
+
+`slack-cli activity` lists your unread activity, the same source as
+Slack's Activity panel (one feed call instead of scanning every DM):
+
+- **Mentions** — messages that mention you in channels (`[thread]` marks
+  ones inside a thread). Each entry has a permalink you can feed straight
+  to `slack-cli read`.
+- **Threads** — threads with unread replies, with the unread count and a
+  link to the latest reply.
+- **Direct messages** — DMs and group DMs whose latest message is from
+  someone else, with a link to it.
 
 ## Related Projects and Resources
 

@@ -40,6 +40,8 @@ def parse_slack_link(url):
 
     query = parse_qs(parsed.query)
     thread_ts = query.get("thread_ts", [None])[0]
+    if thread_ts is not None and "." not in thread_ts:
+        thread_ts = _convert_timestamp(thread_ts)
 
     is_thread = thread_ts is not None
     is_reply = is_thread and thread_ts != message_ts

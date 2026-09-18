@@ -24,7 +24,14 @@ class SlackAPI:
         self.user_agent = user_agent
 
     def call(self, method, params=None):
-        url = f"{BASE_URL}/{method}"
+        """Call a Slack Web API method on slack.com/api/<method>."""
+        return self._post(f"{BASE_URL}/{method}", params)
+
+    def call_workspace(self, host, path, params=None):
+        """Call a workspace-scoped legacy endpoint (e.g. activity.feed)."""
+        return self._post(f"https://{host}/api/{path}", params)
+
+    def _post(self, url, params):
         xoxd_encoded = quote(self.xoxd_token, safe="")
         headers = {"Cookie": f"d={xoxd_encoded}"}
         if self.user_agent:
@@ -33,7 +40,7 @@ class SlackAPI:
         form_data = dict(params or {})
         form_data["token"] = self.xoxc_token
 
-        logger.debug("API call: %s params=%s", method, params)
+        logger.debug("API call: %s params=%s", url, params)
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
@@ -41,13 +48,13 @@ class SlackAPI:
                 resp.raise_for_status()
             except requests.RequestException as e:
                 if attempt == MAX_RETRIES:
-                    raise SystemExit(f"Error: HTTP request failed for {method}: {e}")
-                logger.warning("HTTP error on %s (attempt %d): %s", method, attempt, e)
+                    raise SystemExit(f"Error: HTTP request failed for {url}: {e}")
+                logger.warning("HTTP error on %s (attempt %d): %s", url, attempt, e)
                 time.sleep(attempt)
                 continue
 
             data = resp.json()
-            logger.debug("API response: %s ok=%s - %s", method, data.get("ok"), data)
+            logger.debug("API response: %s ok=%s - %s", url, data.get("ok"), data)
 
             if data.get("ok"):
                 return data
@@ -58,14 +65,14 @@ class SlackAPI:
                 retry_after = int(resp.headers.get("Retry-After", attempt))
                 if attempt < MAX_RETRIES:
                     logger.warning(
-                        "Rate limited on %s, retrying in %ds", method, retry_after
+                        "Rate limited on %s, retrying in %ds", url, retry_after
                     )
                     time.sleep(retry_after)
                     continue
 
-            raise SlackAPIError(method, error)
+            raise SlackAPIError(url, error)
 
-        raise SlackAPIError(method, "max_retries_exceeded")
+        raise SlackAPIError(url, "max_retries_exceeded")
 
     def call_paginated(self, method, params, key):
         all_items = []
