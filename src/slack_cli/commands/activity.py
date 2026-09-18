@@ -171,7 +171,7 @@ def _classify(items):
                 }
             )
         else:
-            logger.debug("Skipping activity feed item of type %s", itype)
+            logger.warning("Skipping activity feed item of type %s", itype)
     return mentions, threads, dms
 
 
