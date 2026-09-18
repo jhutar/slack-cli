@@ -103,7 +103,11 @@ def run(args, config):
     for dm in dms:
         _resolve_dm(api, dm, my_user_id, names_cache, names_cache_path)
 
-    sys.stdout.write(_format(mentions, threads, dms, host))
+    sys.stdout.write(
+        _links_only(mentions, threads, dms, host)
+        if args.csv
+        else _format(mentions, threads, dms, host)
+    )
 
 
 def _fetch_feed(api, host):
@@ -222,6 +226,16 @@ def _fmt_ts(ts):
     return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
         "%Y-%m-%d %H:%M UTC"
     )
+
+
+def _links_only(mentions, threads, dms, host):
+    """One URL per line, no header — for machine processing."""
+    lines = [_link(host, m["channel_id"], m["ts"], m["thread_ts"]) for m in mentions]
+    lines += [
+        _link(host, t["channel_id"], t["latest_ts"], t["thread_ts"]) for t in threads
+    ]
+    lines += [_link(host, dm["channel_id"], dm["ts"]) for dm in dms]
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
 def _format(mentions, threads, dms, host):

@@ -22,8 +22,8 @@ def _make_config(**overrides):
     return cfg
 
 
-def _make_args():
-    return argparse.Namespace()
+def _make_args(csv=False):
+    return argparse.Namespace(csv=csv)
 
 
 def _mock_post(responses):
@@ -208,6 +208,51 @@ class TestActivityCommand:
         assert len(feed_calls) == 2
         assert feed_calls[0][1].get("cursor") is None
         assert feed_calls[1][1]["cursor"] == "cursor-1"
+
+    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands.activity.save_cache")
+    @patch("requests.post")
+    def test_csv_prints_urls_only(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect, _ = _mock_post(
+            [
+                AUTH_OK,
+                _feed(
+                    [
+                        _mention_item(
+                            "C111",
+                            "1718972500.000000",
+                            "UALICE",
+                            thread_ts="1718972400.000000",
+                        ),
+                        _thread_item(
+                            "C111", "1718972700.000000", "1718972400.000000", 3
+                        ),
+                        _dm_item("D222", "1718972900.000000"),
+                    ]
+                ),
+            ]
+        )
+
+        run(_make_args(csv=True), _make_config())
+
+        out = capsys.readouterr().out
+        assert out == (
+            f"https://{HOST}/archives/C111/p1718972500000000"
+            "?thread_ts=1718972400000000\n"
+            f"https://{HOST}/archives/C111/p1718972700000000"
+            "?thread_ts=1718972400000000\n"
+            f"https://{HOST}/archives/D222/p1718972900000000\n"
+        )
+
+    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands.activity.save_cache")
+    @patch("requests.post")
+    def test_csv_empty_prints_nothing(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect, _ = _mock_post([AUTH_OK, _feed([])])
+
+        run(_make_args(csv=True), _make_config())
+
+        assert capsys.readouterr().out == ""
 
     @patch("slack_cli.commands.activity.load_cache", return_value=None)
     @patch("slack_cli.commands.activity.save_cache")

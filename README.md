@@ -129,6 +129,9 @@ slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234
 
 # Morning triage: everything unread that needs a response
 slack-cli activity
+
+# URLs only, one per line (for scripts)
+slack-cli activity --csv
 ```
 
 ### Activity

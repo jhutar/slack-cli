@@ -44,8 +44,13 @@ def main():
         help="number of follow-up messages (integer) or duration (e.g., 30M, 2H)",
     )
 
-    subparsers.add_parser(
+    activity_parser = subparsers.add_parser(
         "activity", help="list unread mentions, threads and DMs needing a response"
+    )
+    activity_parser.add_argument(
+        "--csv",
+        action="store_true",
+        help="print only URLs, one per line, no header (for machine processing)",
     )
 
     extract_parser = subparsers.add_parser(
