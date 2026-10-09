@@ -74,6 +74,7 @@ def run(args, config):
 
         cutoff = time.time() - args.days * 86400
         messages = _fetch_my_messages(api, username, my_user_id, cutoff)
+        _enrich_thread_info(api, messages)
     except SlackAPIError as e:
         _handle_api_error(e)
 
@@ -146,18 +147,76 @@ def _fetch_my_messages(api, username, my_user_id, cutoff):
     return messages
 
 
+def _channel_id(m):
+    """Extract the channel id from a search match (string or object)."""
+    cid = m.get("channel")
+    return cid.get("id") if isinstance(cid, dict) else cid
+
+
+def _enrich_thread_info(api, messages):
+    """Fill thread_ts for messages where search returned none.
+
+    search.messages omits thread_ts on this workspace, so ask
+    conversations.history per message (single-message window). Falls
+    back to conversations.replies if the message is not in the
+    channel's main history. Failures degrade to top-level (comment).
+    """
+    for m in messages:
+        if m.get("thread_ts"):
+            continue
+        cid = _channel_id(m)
+        try:
+            resp = api.call(
+                "conversations.history",
+                {
+                    "channel": cid,
+                    "oldest": m["ts"],
+                    "latest": m["ts"],
+                    "inclusive": "true",
+                    "limit": "1",
+                },
+            )
+            for h in resp.get("messages", []):
+                if h.get("ts") == m["ts"] and h.get("thread_ts"):
+                    m["thread_ts"] = h["thread_ts"]
+                    break
+            if m.get("thread_ts"):
+                continue
+            resp = api.call(
+                "conversations.replies",
+                {"channel": cid, "ts": m["ts"], "limit": "1"},
+            )
+            for h in resp.get("messages", []):
+                if h.get("thread_ts"):
+                    m["thread_ts"] = h["thread_ts"]
+                    break
+        except SlackAPIError as e:
+            logger.warning(
+                "conversations.history failed for %s in %s: %s",
+                m["ts"],
+                cid,
+                e,
+            )
+
+
 def _group_discussions(messages):
     """Split messages into threads (one entry per thread) and comments.
 
     A reply (thread_ts set and != own ts) folds into its thread with a
-    link to the thread root. A top-level message is its own discussion.
+    link to the thread root. A top-level message is its own discussion,
+    except when it is the root of a thread you also replied in — the
+    thread entry already links to it.
     """
     threads = {}
     comments = []
+    roots = set()
+    for m in messages:
+        thread_ts = m.get("thread_ts")
+        if thread_ts and thread_ts != m["ts"]:
+            roots.add((_channel_id(m), thread_ts))
     for m in messages:
         ts = float(m["ts"])
-        cid = m.get("channel")
-        cid = cid.get("id") if isinstance(cid, dict) else cid
+        cid = _channel_id(m)
         thread_ts = m.get("thread_ts")
         if thread_ts and thread_ts != m["ts"]:
             key = (cid, thread_ts)
@@ -173,7 +232,8 @@ def _group_discussions(messages):
             entry["latest_ts"] = max(entry["latest_ts"], ts)
             entry["replies"] += 1
         else:
-            comments.append({"channel_id": cid, "ts": m["ts"], "latest_ts": ts})
+            if (cid, m["ts"]) not in roots:
+                comments.append({"channel_id": cid, "ts": m["ts"], "latest_ts": ts})
     return list(threads.values()), comments
 
 
