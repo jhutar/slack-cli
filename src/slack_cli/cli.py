@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from slack_cli import __version__
-from slack_cli.commands import activity, extract, login, read
+from slack_cli.commands import activity, extract, login, mine, read
 from slack_cli.config import load_config
 from slack_cli.log import setup_logging
 
@@ -54,6 +54,22 @@ def main():
         "activity", help="list unread mentions, threads and DMs needing a response"
     )
     activity_parser.add_argument(
+        "--csv",
+        action="store_true",
+        help="print only URLs, one per line, no header (for machine processing)",
+    )
+
+    mine_parser = subparsers.add_parser(
+        "mine", help="list discussions you participated in over the past N days"
+    )
+    mine_parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        metavar="N",
+        help="look back window in days (default: 7)",
+    )
+    mine_parser.add_argument(
         "--csv",
         action="store_true",
         help="print only URLs, one per line, no header (for machine processing)",
@@ -111,3 +127,5 @@ def main():
         read.run(args, config)
     elif args.subcommand == "activity":
         activity.run(args, config)
+    elif args.subcommand == "mine":
+        mine.run(args, config)

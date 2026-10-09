@@ -133,6 +133,9 @@ slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234
 # Morning triage: everything unread that needs a response
 slack-cli activity
 
+# Your discussions from the past 14 days (thread links + message links)
+slack-cli mine --days 14
+
 # URLs only, one per line (for scripts)
 slack-cli activity --csv
 ```
@@ -149,6 +152,19 @@ Slack's Activity panel (one feed call instead of scanning every DM):
   link to the latest reply.
 - **Direct messages** — DMs and group DMs whose latest message is from
   someone else, with a link to it.
+
+### Mine
+
+`slack-cli mine` lists discussions you participated in over the past
+N days (`--days`, default 7), based on messages you authored:
+
+- **Threads** — one entry per thread you replied in, with a link to
+  the thread root.
+- **Messages** — each top-level message you posted in a channel or DM,
+  with a permalink to it (threads you started appear here too, as the
+  root message is the thread link).
+
+`--csv` prints all discussion links, one per line, newest first.
 
 ## Related Projects and Resources
 
