@@ -1,11 +1,13 @@
 """Mine subcommand — list discussions you participated in over a date window.
 
-Searches messages authored by you via search.messages (user:<name>,
+Searches messages authored by you via search.messages (from:<name>,
 username or display name — the modifier matches loosely, so results
-are filtered by exact user id) and groups them into discussions:
-replies in threads collapse to one entry per thread (link to the
-thread root), top-level messages in channels or DMs get a permalink
-to the message itself.
+are filtered by exact user id). The user: modifier is stale on
+enterprise workspaces and is not used.
+
+Groups results into discussions: replies in threads collapse to one
+entry per thread (link to the thread root), top-level messages in
+channels or DMs get a permalink to the message itself.
 """
 
 import logging
@@ -117,7 +119,7 @@ def _my_search_name(api, user_id):
 def _fetch_my_messages(api, username, my_user_id, cutoff):
     """Fetch messages authored by you, newest first, down to the cutoff."""
     params = {
-        "query": f"user:{username}",
+        "query": f"from:{username}",
         "count": str(SEARCH_COUNT),
         "sort": "ts",
         "sort_dir": "desc",
