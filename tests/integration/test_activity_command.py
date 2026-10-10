@@ -108,8 +108,8 @@ PRELOADED_CACHE = {
 
 
 class TestActivityCommand:
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_full_output(self, mock_post, mock_save, mock_load, capsys):
         side_effect, calls = _mock_post(
@@ -175,8 +175,8 @@ class TestActivityCommand:
         assert feed_calls[0]["mode"] == "chrono_v1"
         assert feed_calls[0]["token"] == "xoxc-test"
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_empty_feed(self, mock_post, mock_save, mock_load, capsys):
         mock_post.side_effect, _ = _mock_post([AUTH_OK, _feed([])])
@@ -187,8 +187,8 @@ class TestActivityCommand:
         assert "Nothing unread" in out
         assert "## Mentions" not in out
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_pagination_follows_cursor(self, mock_post, mock_save, mock_load, capsys):
         side_effect, calls = _mock_post(
@@ -209,8 +209,8 @@ class TestActivityCommand:
         assert feed_calls[0][1].get("cursor") is None
         assert feed_calls[1][1]["cursor"] == "cursor-1"
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_csv_prints_urls_only(self, mock_post, mock_save, mock_load, capsys):
         mock_post.side_effect, _ = _mock_post(
@@ -244,8 +244,8 @@ class TestActivityCommand:
             f"https://{HOST}/archives/D222/p1718972900000000\n"
         )
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_csv_empty_prints_nothing(self, mock_post, mock_save, mock_load, capsys):
         mock_post.side_effect, _ = _mock_post([AUTH_OK, _feed([])])
@@ -254,8 +254,8 @@ class TestActivityCommand:
 
         assert capsys.readouterr().out == ""
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=None)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=None)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_resolves_names_from_api(self, mock_post, mock_save, mock_load, capsys):
         mock_post.side_effect, _ = _mock_post(
@@ -306,7 +306,7 @@ class TestActivityCommand:
         assert "SLACK_CLI_XOXC_TOKEN" in err
         assert "SLACK_CLI_XOXD_TOKEN" in err
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
     @patch("requests.post")
     def test_api_error_exits(self, mock_post, mock_load, capsys):
         mock_post.side_effect, _ = _mock_post(
@@ -317,8 +317,8 @@ class TestActivityCommand:
         assert e.value.code == 2
         assert "Authentication failed" in capsys.readouterr().err
 
-    @patch("slack_cli.commands.activity.load_cache", return_value=PRELOADED_CACHE)
-    @patch("slack_cli.commands.activity.save_cache")
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_unknown_types_skipped(self, mock_post, mock_save, mock_load, capsys):
         mock_post.side_effect, _ = _mock_post(
