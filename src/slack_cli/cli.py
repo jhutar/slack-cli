@@ -70,9 +70,15 @@ def main():
         help="look back window in days (default: 7)",
     )
     mine_parser.add_argument(
+        "--collapsed",
+        action="store_true",
+        help="group thread replies and collapse messages per channel, DM "
+        "and group DM (default: one entry per message)",
+    )
+    mine_parser.add_argument(
         "--csv",
         action="store_true",
-        help="print only URLs, one per line, no header (for machine processing)",
+        help="print a CSV table: link,source_type,from_where,from_time,to_time",
     )
 
     extract_parser = subparsers.add_parser(

@@ -50,8 +50,8 @@ def names_cache(config):
 
 
 def attach_label(api, d, my_user_id, names_cache, names_cache_path):
-    """Fill d['label'] — DM participant names for D-channels, #channel otherwise."""
-    if d["channel_id"].startswith("D"):
+    """Fill d['label'] — DM participant names for DMs (D/G), #channel otherwise."""
+    if d["channel_id"].startswith(("D", "G")):
         resolve_dm(api, d, my_user_id, names_cache, names_cache_path)
     else:
         d["label"] = (
@@ -82,7 +82,9 @@ def resolve_dm(api, item, my_user_id, names_cache, names_cache_path):
         names_cache["dms"] = dms
         save_cache(names_cache_path, names_cache)
     others = info["members"]
+    item["members"] = others
     group = item.get("group", not info["is_im"])
+    item["group"] = group
     if group:
         names = ", ".join(
             resolve_user(api, u, names_cache, names_cache_path) for u in others

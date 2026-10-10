@@ -1,18 +1,21 @@
-"""Mine subcommand — list discussions you participated in over a date window.
+"""Mine subcommand — list your Slack activity over a date window.
 
 Searches messages authored by you via search.messages (from:<name>,
 username or display name — the modifier matches loosely, so results
 are filtered by exact user id). The user: modifier is stale on
 enterprise workspaces and is not used.
 
-Groups results into discussions: replies in threads collapse to one
-entry per thread (link to the thread root), top-level messages in
-channels or DMs get a permalink to the message itself.
+Default output is expanded: one entry per message. With --collapsed,
+thread replies fold into one entry per thread (link to the thread
+root) and your top-level messages fold into one entry per channel,
+DM, or group DM (link to your earliest message there).
 """
 
+import csv
 import logging
 import sys
 import time
+from datetime import datetime, timezone
 
 from slack_cli.api import SlackAPI, SlackAPIError
 from slack_cli.commands._shared import (
@@ -22,6 +25,8 @@ from slack_cli.commands._shared import (
     link,
     names_cache,
     require_tokens,
+    resolve_channel,
+    resolve_user,
     workspace,
 )
 
@@ -34,7 +39,7 @@ MAX_PAGES = 25
 
 
 def run(args, config):
-    """Fetch your messages for the window and print grouped discussions."""
+    """Fetch your messages for the window and print them flat or grouped."""
     if args.days < 1:
         print("Error: --days must be at least 1", file=sys.stderr)
         sys.exit(1)
@@ -57,22 +62,112 @@ def run(args, config):
     except SlackAPIError as e:
         handle_api_error(e)
 
-    threads, comments = group_discussions(messages)
-    for d in threads + comments:
+    entries = group_collapsed(messages) if args.collapsed else expand(messages)
+    for d in entries:
         attach_label(api, d, my_id, cache, cache_path)
+        if d.get("kind") == "dm" and d.get("group"):
+            d["kind"] = "group_dm"
 
     # One sort; display sections keep relative order.
-    ordered = sorted(threads + comments, key=lambda d: d["latest_ts"], reverse=True)
-    threads = [d for d in ordered if "thread_ts" in d]
-    comments = [d for d in ordered if "thread_ts" not in d]
+    key = "latest_ts" if args.collapsed else "ts"
+    ordered = sorted(entries, key=lambda d: float(d[key]), reverse=True)
 
     if args.csv:
-        sys.stdout.write(
-            "\n".join(discussion_link(host, d) for d in ordered)
-            + ("\n" if ordered else "")
-        )
+        _write_csv(api, host, ordered, cache, cache_path)
+    elif args.collapsed:
+        threads = [d for d in ordered if d["kind"] == "thread"]
+        rest = [d for d in ordered if d["kind"] != "thread"]
+        sys.stdout.write(_format_collapsed(threads, rest, host, args.days))
     else:
-        sys.stdout.write(_format(threads, comments, host, args.days))
+        sys.stdout.write(_format_expanded(ordered, host, args.days))
+
+
+def _is_dm_channel(cid):
+    """True for 1:1 DM (D) and group DM/MPIM (G) channel ids."""
+    return cid.startswith(("D", "G"))
+
+
+def expand(messages):
+    """Build one flat entry per message (expanded mode).
+
+    Tags each message with its kind (thread replies count as
+    "thread"), from_val, and to_val (both the message's own ts).
+    """
+    for m in messages:
+        cid = _channel_id(m)
+        m["channel_id"] = cid
+        if _is_reply(m):
+            m["kind"] = "thread"
+        elif _is_dm_channel(cid):
+            m["kind"] = "dm"
+        else:
+            m["kind"] = "channel"
+        m["from_val"] = float(m["ts"])
+        m["to_val"] = float(m["ts"])
+    return messages
+
+
+def group_collapsed(messages):
+    """Group your messages into one entry per thread and per conversation.
+
+    Replies fold into their thread (link to the root). Top-level
+    messages fold into one entry per DM/group DM/channel; a channel
+    entry excludes thread roots you also replied in, since the thread
+    entry already links to them.
+    """
+    threads = {}
+    chats = {}
+    roots = {(_channel_id(m), m["thread_ts"]) for m in messages if _is_reply(m)}
+    for m in messages:
+        cid = _channel_id(m)
+        m["channel_id"] = cid
+        if _is_reply(m):
+            entry = threads.setdefault(
+                (cid, m["thread_ts"]),
+                {
+                    "kind": "thread",
+                    "channel_id": cid,
+                    "thread_ts": m["thread_ts"],
+                    "latest_ts": 0.0,
+                    "replies": 0,
+                },
+            )
+            entry["latest_ts"] = max(entry["latest_ts"], float(m["ts"]))
+            entry["replies"] += 1
+        elif _is_dm_channel(cid) or (cid, m["ts"]) not in roots:
+            entry = chats.get(cid)
+            if entry is None:
+                entry = chats[cid] = _new_chat(cid, m)
+            else:
+                _extend_chat(entry, m)
+    for t in threads.values():
+        t["from_val"] = float(t["thread_ts"])
+        t["to_val"] = t["latest_ts"]
+    for c in chats.values():
+        c["from_val"] = c["first_val"]
+        c["to_val"] = c["latest_ts"]
+    return list(threads.values()) + list(chats.values())
+
+
+def _new_chat(cid, m):
+    """Fresh collapsed entry for a channel/DM/group DM conversation."""
+    return {
+        "kind": "dm" if _is_dm_channel(cid) else "channel",
+        "channel_id": cid,
+        "first_ts": m["ts"],
+        "first_val": float(m["ts"]),
+        "latest_ts": float(m["ts"]),
+        "count": 1,
+    }
+
+
+def _extend_chat(entry, m):
+    """Fold one more of your messages into a collapsed conversation entry."""
+    v = float(m["ts"])
+    if v < entry["first_val"]:
+        entry["first_val"], entry["first_ts"] = v, m["ts"]
+    entry["latest_ts"] = max(entry["latest_ts"], v)
+    entry["count"] += 1
 
 
 def my_search_name(api, user_id):
@@ -114,12 +209,13 @@ def fetch_my_messages(api, username, my_user_id, days):
 
 
 def _mine(m, my_user_id, cutoff):
-    """True if m is a channel/DM message by me within the window.
+    """True if m is a channel/DM/group DM message by me within the window.
 
-    DM messages come back as type "im", channels as "message".
+    Channels come back as type "message", 1:1 DMs as "im", group DMs
+    as "mpim".
     """
     return (
-        m.get("type") in ("message", "im")
+        m.get("type") in ("message", "im", "mpim")
         and m.get("user") == my_user_id
         and float(m.get("ts", 0)) >= cutoff
     )
@@ -180,56 +276,78 @@ def _thread_ts_of(api, cid, ts):
     return None
 
 
-def group_discussions(messages):
-    """Split messages into threads (one entry per thread) and comments.
+def entry_link(host, d):
+    """Permalink for an entry (thread root link or message link).
 
-    A reply folds into its thread with a link to the thread root. A
-    top-level message is its own discussion, except when it is the
-    root of a thread you also replied in — the thread entry already
-    links to it.
+    Collapsed thread entries link to the root with the thread view
+    param so Slack opens the thread directly. Collapsed conversations
+    link to your earliest message; individual messages link to
+    themselves (thread replies included — no thread param).
     """
-    threads = {}
-    roots = {(_channel_id(m), m["thread_ts"]) for m in messages if _is_reply(m)}
-    comments = []
-    for m in messages:
-        cid = _channel_id(m)
-        if _is_reply(m):
-            key = (cid, m["thread_ts"])
-            entry = threads.setdefault(
-                key,
-                {
-                    "channel_id": cid,
-                    "thread_ts": m["thread_ts"],
-                    "latest_ts": 0.0,
-                    "replies": 0,
-                },
-            )
-            entry["latest_ts"] = max(entry["latest_ts"], float(m["ts"]))
-            entry["replies"] += 1
-        elif (cid, m["ts"]) not in roots:
-            comments.append(
-                {"channel_id": cid, "ts": m["ts"], "latest_ts": float(m["ts"])}
-            )
-    return list(threads.values()), comments
-
-
-def discussion_link(host, d):
-    """Permalink for a discussion entry (thread root link or message link).
-
-    Threads link to the root with the thread view param so Slack opens
-    the thread directly.
-    """
-    if "thread_ts" in d:
+    if d["kind"] == "thread" and "ts" not in d:
         root = d["thread_ts"]
         return link(host, d["channel_id"], root, root)
-    return link(host, d["channel_id"], d["ts"])
+    ts = d.get("ts") or d.get("first_ts")
+    return link(host, d["channel_id"], ts)
 
 
-def _format(threads, comments, host, days):
-    """Build the output listing of your discussions."""
-    lines = [f"# Your Slack activity — last {days} day{'s' if days != 1 else ''}", ""]
-    if not (threads or comments):
-        return "\n".join(lines + ["No messages found in this window."]) + "\n"
+def _from_where(api, d, cache, cache_path):
+    """CSV from_where field: #channel, #channel@thread_ts, or DM names."""
+    if d["channel_id"].startswith(("D", "G")):
+        names = [resolve_user(api, u, cache, cache_path) for u in d["members"]]
+        return ", ".join(names)
+    chan = f"#{resolve_channel(api, d['channel_id'], cache, cache_path)}"
+    if d["kind"] == "thread":
+        return f"{chan}@{d['thread_ts']}"
+    return chan
+
+
+def iso_utc(ts):
+    """Format a Slack ts as ISO 8601 UTC with second precision."""
+    return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+
+def _write_csv(api, host, ordered, cache, cache_path):
+    """Print the CSV table: header row plus one row per entry."""
+    w = csv.writer(sys.stdout, lineterminator="\n")
+    w.writerow(["link", "source_type", "from_where", "from_time", "to_time"])
+    for d in ordered:
+        w.writerow(
+            [
+                entry_link(host, d),
+                d["kind"],
+                _from_where(api, d, cache, cache_path),
+                iso_utc(d["from_val"]),
+                iso_utc(d["to_val"]),
+            ]
+        )
+
+
+def _heading(days):
+    """Top line: '# Your Slack activity — last N days'."""
+    return f"# Your Slack activity — last {days} day{'s' if days != 1 else ''}"
+
+
+def _format_expanded(ordered, host, days):
+    """Build the flat listing: one entry per message, newest first."""
+    lines = [_heading(days), "", f"## Your messages ({len(ordered)})", ""]
+    if not ordered:
+        lines.append("No messages found in this window.")
+        return "\n".join(lines).rstrip("\n") + "\n"
+    for i, m in enumerate(ordered, 1):
+        lines.append(f"{i}. {m['label']} · {fmt_ts(float(m['ts']))}")
+        lines.append(f"   {entry_link(host, m)}")
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def _format_collapsed(threads, rest, host, days):
+    """Build the grouped listing: thread entries, then conversation entries."""
+    lines = [_heading(days), ""]
+    if not (threads or rest):
+        lines.append("No messages found in this window.")
+        return "\n".join(lines).rstrip("\n") + "\n"
 
     if threads:
         lines.append(f"## Threads you participated in ({len(threads)})")
@@ -243,15 +361,19 @@ def _format(threads, comments, host, days):
             lines.append(
                 f"{i}. {t['label']} · you, last {fmt_ts(t['latest_ts'])}{extra}"
             )
-            lines.append(f"   {discussion_link(host, t)}")
+            lines.append(f"   {entry_link(host, t)}")
         lines.append("")
 
-    if comments:
-        lines.append(f"## Your messages in channels and DMs ({len(comments)})")
+    if rest:
+        lines.append(f"## Your messages in channels and DMs ({len(rest)})")
         lines.append("")
-        for i, c in enumerate(comments, 1):
-            lines.append(f"{i}. {c['label']} · {fmt_ts(c['ts'])}")
-            lines.append(f"   {discussion_link(host, c)}")
+        for i, c in enumerate(rest, 1):
+            if c["count"] > 1:
+                mid = f"you, first {fmt_ts(c['first_val'])} · {c['count']} by you"
+            else:
+                mid = fmt_ts(c["first_val"])
+            lines.append(f"{i}. {c['label']} · {mid}")
+            lines.append(f"   {entry_link(host, c)}")
         lines.append("")
 
     return "\n".join(lines).rstrip("\n") + "\n"

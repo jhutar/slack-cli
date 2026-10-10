@@ -133,8 +133,11 @@ slack-cli --log-level DEBUG read 'https://mywork.slack.com/archives/C01234/p1234
 # Morning triage: everything unread that needs a response
 slack-cli activity
 
-# Your discussions from the past 14 days (thread links + message links)
+# Your messages from the past 14 days (one entry per message)
 slack-cli mine --days 14
+
+# Same, grouped: one link per thread and per channel/DM
+slack-cli mine --days 14 --collapsed
 
 # URLs only, one per line (for scripts)
 slack-cli activity --csv
@@ -155,16 +158,21 @@ Slack's Activity panel (one feed call instead of scanning every DM):
 
 ### Mine
 
-`slack-cli mine` lists discussions you participated in over the past
-N days (`--days`, default 7), based on messages you authored:
+`slack-cli mine` lists your activity over the past N days (`--days`,
+default 7), based on messages you authored:
 
-- **Threads** — one entry per thread you replied in, with a link to
-  the thread root.
-- **Messages** — each top-level message you posted in a channel or DM,
-  with a permalink to it (threads you started appear here too, as the
-  root message is the thread link).
+- **Expanded (default)** — one entry per message you posted: channel
+  messages, thread replies, DMs, and group DMs, each with a permalink.
+- **Collapsed (`--collapsed`)** — one entry per thread you replied in
+  (link to the thread root), and one entry per channel, DM, or group DM
+  for your top-level messages (link to your earliest message there).
 
-`--csv` prints all discussion links, one per line, newest first.
+`--csv` prints a CSV table with a header row, one row per entry
+(message or collapsed group), newest first:
+`link,source_type,from_where,from_time,to_time`. `source_type` is
+`channel`, `thread`, `dm`, or `group_dm`; `from_where` is `#channel`,
+`#channel@<thread_ts>` for threads, or the DM participant name(s);
+times are ISO 8601 UTC (for groups, your first and last message).
 
 ## Related Projects and Resources
 
