@@ -13,6 +13,7 @@ DM, or group DM (link to your earliest message there).
 
 import csv
 import logging
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -32,9 +33,10 @@ from slack_cli.commands._shared import (
 
 logger = logging.getLogger(__name__)
 
-# Search returns at most 200 results per page; cap total pages as a
+# Search caps count at 100 per page on this workspace (higher values
+# are clamped with a max_count_limit warning); cap total pages as a
 # safety net so a very wide window can't loop forever.
-SEARCH_COUNT = 200
+SEARCH_COUNT = 100
 MAX_PAGES = 25
 
 
@@ -186,13 +188,19 @@ def my_search_name(api, user_id):
 
 
 def fetch_my_messages(api, username, my_user_id, days):
-    """Fetch messages authored by you, newest first, within the window."""
+    """Fetch messages authored by you, newest first, within the window.
+
+    Uses page-based pagination: this workspace's search.messages does
+    not return response_metadata.next_cursor, so cursor paging stops
+    after the first page.
+    """
     cutoff = time.time() - days * 86400
     params = {
         "query": f"from:{username}",
         "count": str(SEARCH_COUNT),
         "sort": "ts",
         "sort_dir": "desc",
+        "page": "1",
     }
     messages = []
     for _ in range(MAX_PAGES):
@@ -201,10 +209,7 @@ def fetch_my_messages(api, username, my_user_id, days):
         messages.extend(m for m in raw if _mine(m, my_user_id, cutoff))
         if not raw or float(raw[-1].get("ts", 0)) < cutoff:
             break
-        cursor = (resp.get("response_metadata") or {}).get("next_cursor", "")
-        if not cursor:
-            break
-        params["cursor"] = cursor
+        params["page"] = str(int(params["page"]) + 1)
     return messages
 
 
@@ -232,15 +237,27 @@ def _is_reply(m):
     return m.get("thread_ts") and m["thread_ts"] != m["ts"]
 
 
+# thread_ts param inside a search result permalink.
+THREAD_TS_RE = re.compile(r"[?&]thread_ts=([0-9.]+)")
+
+
 def enrich_thread_info(api, messages):
     """Fill thread_ts for messages where search returned none.
 
-    search.messages omits thread_ts on this workspace, so look each
-    message up individually. Failures degrade to top-level (comment).
-    """
+    search.messages omits the thread_ts field on this workspace, but
+    the permalink always carries ?thread_ts= for replies — parse it
+    first. Only messages without a permalink fall back to per-message
+    history/replies lookups (failures degrade to top-level)."""
     for m in messages:
-        if not m.get("thread_ts"):
+        if m.get("thread_ts"):
+            continue
+        pl = m.get("permalink") or ""
+        if not pl:
             m["thread_ts"] = _thread_ts_of(api, _channel_id(m), m["ts"])
+            continue
+        match = THREAD_TS_RE.search(pl)
+        if match:
+            m["thread_ts"] = match.group(1)
 
 
 def _thread_ts_of(api, cid, ts):
