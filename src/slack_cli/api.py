@@ -17,6 +17,17 @@ class SlackAPIError(Exception):
         super().__init__(f"Slack API error on {method}: {error}")
 
 
+def _retry_after(e):
+    """Seconds from the Retry-After header on a failed response, or None."""
+    response = getattr(e, "response", None)
+    if response is None:
+        return None
+    value = response.headers.get("Retry-After", "").strip()
+    if not value.isdigit():
+        return None
+    return int(value)
+
+
 class SlackAPI:
     def __init__(self, xoxc_token, xoxd_token, user_agent=None):
         self.xoxc_token = xoxc_token
@@ -49,8 +60,16 @@ class SlackAPI:
             except requests.RequestException as e:
                 if attempt == MAX_RETRIES:
                     raise SystemExit(f"Error: HTTP request failed for {url}: {e}")
-                logger.warning("HTTP error on %s (attempt %d): %s", url, attempt, e)
-                time.sleep(attempt)
+                retry_after = _retry_after(e)
+                delay = retry_after if retry_after is not None else attempt
+                logger.warning(
+                    "HTTP error on %s (attempt %d): %s, retrying in %ds",
+                    url,
+                    attempt,
+                    e,
+                    delay,
+                )
+                time.sleep(delay)
                 continue
 
             data = resp.json()
