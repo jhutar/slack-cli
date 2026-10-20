@@ -5,6 +5,8 @@ from slack_cli.commands.mine import run
 
 HOST = "test.slack.com"
 ME = "UME"
+# Frozen "now" (2026-10-10 00:15 UTC): test ts values sit inside the 7-day window.
+NOW = 1791591300.0
 
 AUTH_OK = {"ok": True, "user_id": ME, "url": f"https://{HOST}"}
 PROFILE_OK = {"ok": True, "profile": {"username": "me"}}
@@ -94,10 +96,11 @@ def _responses(matches):
 
 
 class TestMineCommand:
+    @patch("slack_cli.commands.mine.time.time", return_value=NOW)
     @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
     @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
-    def test_expanded_default(self, mock_post, mock_save, mock_load, capsys):
+    def test_expanded_default(self, mock_post, mock_save, mock_load, mock_time, capsys):
         mock_post.side_effect, _ = _mock_post(_responses(MATCHES))
 
         run(_make_args(), _make_config())
@@ -115,10 +118,11 @@ class TestMineCommand:
         assert "?thread_ts" not in out
         assert "## Threads" not in out
 
+    @patch("slack_cli.commands.mine.time.time", return_value=NOW)
     @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
     @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
-    def test_collapsed_display(self, mock_post, mock_save, mock_load, capsys):
+    def test_collapsed_display(self, mock_post, mock_save, mock_load, mock_time, capsys):
         mock_post.side_effect, _ = _mock_post(_responses(MATCHES))
 
         run(_make_args(collapsed=True), _make_config())
@@ -140,10 +144,11 @@ class TestMineCommand:
         assert "3. #eng · you, first 2026-10-10 00:05 UTC · 2 by you" in out
         assert f"https://{HOST}/archives/C111/p1791590700000000" in out
 
+    @patch("slack_cli.commands.mine.time.time", return_value=NOW)
     @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
     @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
-    def test_csv_expanded(self, mock_post, mock_save, mock_load, capsys):
+    def test_csv_expanded(self, mock_post, mock_save, mock_load, mock_time, capsys):
         mock_post.side_effect, _ = _mock_post(_responses(MATCHES))
 
         run(_make_args(csv=True), _make_config())
@@ -167,10 +172,11 @@ class TestMineCommand:
             "#eng@1791590400.000000,2026-10-10T00:01:40Z,2026-10-10T00:01:40Z\n"
         )
 
+    @patch("slack_cli.commands.mine.time.time", return_value=NOW)
     @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
     @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
-    def test_csv_collapsed(self, mock_post, mock_save, mock_load, capsys):
+    def test_csv_collapsed(self, mock_post, mock_save, mock_load, mock_time, capsys):
         mock_post.side_effect, _ = _mock_post(_responses(MATCHES))
 
         run(_make_args(collapsed=True, csv=True), _make_config())
@@ -189,11 +195,12 @@ class TestMineCommand:
             "2026-10-10T00:00:00Z,2026-10-10T00:03:20Z\n"
         )
 
+    @patch("slack_cli.commands.mine.time.time", return_value=NOW)
     @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
     @patch("slack_cli.commands._shared.save_cache")
     @patch("requests.post")
     def test_collapsed_thread_root_excluded_from_channel(
-        self, mock_post, mock_save, mock_load, capsys
+        self, mock_post, mock_save, mock_load, mock_time, capsys
     ):
         # I started the thread and replied in it: one thread entry,
         # no channel entry (the root is not a standalone message).
