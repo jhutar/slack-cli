@@ -57,6 +57,21 @@ def _mention_item(channel, ts, author, thread_ts=None):
     }
 
 
+def _unjoined_mention_item(channel, ts, inviter):
+    return {
+        "is_unread": True,
+        "feed_ts": ts,
+        "item": {
+            "type": "unjoined_channel_mention",
+            "unjoined_channel_mention_payload": {
+                "channel_id": channel,
+                "inviter_user_id": inviter,
+                "message_ts": ts,
+            },
+        },
+    }
+
+
 def _thread_item(channel, latest_ts, thread_ts, unread):
     return {
         "is_unread": True,
@@ -99,7 +114,7 @@ PRELOADED_CACHE = {
         "UDAVE": "Dave",
         "UERIN": "Erin",
     },
-    "channels": {"C111": "eng"},
+    "channels": {"C111": "eng", "C444": "forum"},
     "dms": {
         "D222": {"members": ["UCAROL"], "is_im": True},
         "G333": {"members": ["UDAVE", "UERIN"], "is_im": False},
@@ -253,6 +268,55 @@ class TestActivityCommand:
         run(_make_args(csv=True), _make_config())
 
         assert capsys.readouterr().out == ""
+
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
+    @patch("requests.post")
+    def test_unjoined_channel_mention(self, mock_post, mock_save, mock_load, capsys):
+        mock_post.side_effect, _ = _mock_post(
+            [
+                AUTH_OK,
+                _feed(
+                    [
+                        _unjoined_mention_item("C444", "1718972600.000000", "UBOB"),
+                    ]
+                ),
+            ]
+        )
+
+        run(_make_args(), _make_config())
+
+        out = capsys.readouterr().out
+        assert "## Mentions (1)" in out
+        assert "1. #forum · @Bob · 2024-06-21 12:23 UTC" in out
+        assert f"https://{HOST}/archives/C444/p1718972600000000" in out
+
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
+    @patch("requests.post")
+    def test_mention_missing_fields_skipped(
+        self, mock_post, mock_save, mock_load, capsys
+    ):
+        mock_post.side_effect, _ = _mock_post(
+            [
+                AUTH_OK,
+                _feed(
+                    [
+                        # No "message" key and no payload -> unusable item.
+                        {
+                            "is_unread": True,
+                            "feed_ts": "1718972600.000000",
+                            "item": {"type": "at_user"},
+                        },
+                    ]
+                ),
+            ]
+        )
+
+        run(_make_args(), _make_config())
+
+        out = capsys.readouterr().out
+        assert "Nothing unread" in out
 
     @patch("slack_cli.commands._shared.load_cache", return_value=None)
     @patch("slack_cli.commands._shared.save_cache")

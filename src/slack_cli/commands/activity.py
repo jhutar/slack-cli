@@ -102,21 +102,43 @@ def _fetch_feed(api, host):
 
 
 def _classify(items):
-    """Split feed items into mentions, threads, and DMs. Unknown types skipped."""
+    """Split feed items into mentions, threads, and DMs.
+
+    Items with missing channel or ts are skipped (they would produce
+    unusable permalinks like /archives//p0).
+    """
     mentions, threads, dms = [], [], []
     for entry in items:
         item = entry.get("item", {})
         itype = item.get("type")
         if itype in MENTION_TYPES:
-            msg = item.get("message", {})
-            mentions.append(
-                {
-                    "channel_id": msg.get("channel", ""),
-                    "ts": msg.get("ts", "0"),
-                    "thread_ts": msg.get("thread_ts"),
-                    "author_id": msg.get("author_user_id", ""),
-                }
-            )
+            if itype == "unjoined_channel_mention":
+                # No "message" key; data lives in a dedicated payload.
+                payload = item.get("unjoined_channel_mention_payload", {}) or {}
+                mentions.append(
+                    {
+                        "channel_id": payload.get("channel_id", ""),
+                        "ts": payload.get("message_ts", "0"),
+                        "thread_ts": None,
+                        "author_id": payload.get("inviter_user_id", ""),
+                    }
+                )
+            else:
+                msg = item.get("message", {})
+                mentions.append(
+                    {
+                        "channel_id": msg.get("channel", ""),
+                        "ts": msg.get("ts", "0"),
+                        "thread_ts": msg.get("thread_ts"),
+                        "author_id": msg.get("author_user_id", ""),
+                    }
+                )
+            if not mentions[-1]["channel_id"] or mentions[-1]["ts"] == "0":
+                logger.warning(
+                    "Skipping activity feed item of type %s: missing channel or ts",
+                    itype,
+                )
+                mentions.pop()
         elif itype == "thread_v2":
             te = (item.get("bundle_info", {}).get("payload", {}) or {}).get(
                 "thread_entry", {}
