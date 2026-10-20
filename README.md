@@ -141,6 +141,9 @@ slack-cli mine --days 14 --collapsed
 
 # URLs only, one per line (for scripts)
 slack-cli activity --csv
+
+# Mark items as read (server-side, clears Slack's Activity tab)
+slack-cli mark-read 'https://mywork.slack.com/archives/C01234/p1234567890123456?thread_ts=1234567890123456'
 ```
 
 ### Activity
@@ -155,6 +158,21 @@ Slack's Activity panel (one feed call instead of scanning every DM):
   link to the latest reply.
 - **Direct messages** — DMs and group DMs whose latest message is from
   someone else, with a link to it.
+
+### Mark read
+
+`slack-cli mark-read <slack-link>...` marks activity feed items as read
+server-side — the same state Slack's own Activity tab uses, so items
+disappear from it. Links are the permalinks printed by
+`slack-cli activity` (plain or `--csv`):
+
+- Each link is matched against the current unread activity feed; the
+  matching feed item is marked read up to the link's timestamp, so
+  replies newer than the link stay unread.
+- Links not in the unread feed anymore (already read) produce a warning
+  and are skipped; the remaining links are still processed.
+- Marks are irreversible. Malformed links or Slack API failures exit
+  with an error.
 
 ### Mine
 

@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from slack_cli import __version__
-from slack_cli.commands import activity, extract, login, mine, read
+from slack_cli.commands import activity, extract, login, mark_read, mine, read
 from slack_cli.config import load_config
 from slack_cli.log import setup_logging
 
@@ -57,6 +57,17 @@ def main():
         "--csv",
         action="store_true",
         help="print only URLs, one per line, no header (for machine processing)",
+    )
+
+    mark_read_parser = subparsers.add_parser(
+        "mark-read",
+        help="mark activity feed items as read via Slack permalinks",
+    )
+    mark_read_parser.add_argument(
+        "slack_links",
+        metavar="slack-link",
+        nargs="+",
+        help="Slack message URL(s), e.g. from `slack-cli activity --csv`",
     )
 
     mine_parser = subparsers.add_parser(
@@ -133,5 +144,7 @@ def main():
         read.run(args, config)
     elif args.subcommand == "activity":
         activity.run(args, config)
+    elif args.subcommand == "mark-read":
+        mark_read.run(args, config)
     elif args.subcommand == "mine":
         mine.run(args, config)
