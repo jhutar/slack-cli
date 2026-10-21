@@ -2,7 +2,7 @@ import argparse
 import sys
 
 from slack_cli import __version__
-from slack_cli.commands import activity, extract, login, mark_read, mine, read
+from slack_cli.commands import activity, extract, login, mark_read, mine, read, write
 from slack_cli.config import load_config
 from slack_cli.log import setup_logging
 
@@ -92,6 +92,29 @@ def main():
         help="print a CSV table: link,source_type,from_where,from_time,to_time",
     )
 
+    write_parser = subparsers.add_parser(
+        "write",
+        help="send a markdown-formatted message to a channel, DM, group or thread",
+    )
+    write_parser.add_argument(
+        "target",
+        help="Slack message link (reply: into that thread, or starting a new "
+        "thread from the message), channel/DM/group ID (C.../D.../G...) "
+        "or user ID (U...)",
+    )
+    write_parser.add_argument(
+        "message",
+        nargs="?",
+        default=None,
+        help="message text in markdown (or use --file / stdin)",
+    )
+    write_parser.add_argument(
+        "--file",
+        metavar="PATH",
+        default=None,
+        help="read the message from a markdown file",
+    )
+
     extract_parser = subparsers.add_parser(
         "extract", help="extract tokens from Slack desktop app and write config"
     )
@@ -148,3 +171,5 @@ def main():
         mark_read.run(args, config)
     elif args.subcommand == "mine":
         mine.run(args, config)
+    elif args.subcommand == "write":
+        write.run(args, config)

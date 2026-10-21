@@ -1,4 +1,4 @@
-from slack_cli.mrkdwn import convert
+from slack_cli.mrkdwn import convert, to_mrkdwn
 
 
 def test_bold():
@@ -85,3 +85,77 @@ def test_code_block_preserves_mrkdwn():
     result = convert(text)
     assert "*bold* _italic_" in result
     assert "**bold**" in result
+
+
+# --- to_mrkdwn (markdown -> Slack mrkdwn) ---
+
+
+def test_to_mrkdwn_bold():
+    assert to_mrkdwn("**bold text**") == "*bold text*"
+
+
+def test_to_mrkdwn_bold_underscores():
+    assert to_mrkdwn("__bold text__") == "*bold text*"
+
+
+def test_to_mrkdwn_italic():
+    assert to_mrkdwn("*italic text*") == "_italic text_"
+
+
+def test_to_mrkdwn_italic_underscores_unchanged():
+    assert to_mrkdwn("_italic text_") == "_italic text_"
+
+
+def test_to_mrkdwn_strikethrough():
+    assert to_mrkdwn("~~struck text~~") == "~struck text~"
+
+
+def test_to_mrkdwn_mixed_formatting():
+    result = to_mrkdwn("**bold** and *italic* and ~~struck~~")
+    assert result == "*bold* and _italic_ and ~struck~"
+
+
+def test_to_mrkdwn_inline_code_unchanged():
+    assert to_mrkdwn("`**not bold**`") == "`**not bold**`"
+
+
+def test_to_mrkdwn_fenced_code_block_unchanged():
+    text = "before ```\n**not bold**\n``` after **bold**"
+    result = to_mrkdwn(text)
+    assert "**not bold**" in result
+    assert "*bold*" in result
+
+
+def test_to_mrkdwn_link_with_display_text():
+    assert (
+        to_mrkdwn("[Click here](https://example.com)")
+        == "<https://example.com|Click here>"
+    )
+
+
+def test_to_mrkdwn_bare_link_unchanged():
+    assert to_mrkdwn("https://example.com") == "https://example.com"
+
+
+def test_to_mrkdwn_heading():
+    assert to_mrkdwn("# Heading") == "*Heading*"
+
+
+def test_to_mrkdwn_heading_with_bold_not_doubled():
+    assert to_mrkdwn("# **Bold heading**") == "*Bold heading*"
+
+
+def test_to_mrkdwn_blockquote_unchanged():
+    assert to_mrkdwn("> quoted text") == "> quoted text"
+
+
+def test_to_mrkdwn_list_unchanged():
+    assert to_mrkdwn("- item one\n- item two") == "- item one\n- item two"
+
+
+def test_to_mrkdwn_spacing_not_italic():
+    assert to_mrkdwn("a * b * c") == "a * b * c"
+
+
+def test_to_mrkdwn_snake_case_not_bold():
+    assert to_mrkdwn("some_var_name") == "some_var_name"

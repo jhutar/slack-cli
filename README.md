@@ -14,6 +14,8 @@ to an AI agent or another tool.
 - Resolves user mentions and channel references to display names
 - Lists unread mentions, threads and DMs needing a response (`activity`) —
   the same feed as Slack's Activity panel
+- Sends markdown-formatted messages to channels, DMs, group chats and
+  threads (`write`) with `@mention`/`#channel` resolution
 
 ## Setup
 
@@ -144,6 +146,22 @@ slack-cli activity --csv
 
 # Mark items as read (server-side, clears Slack's Activity tab)
 slack-cli mark-read 'https://mywork.slack.com/archives/C01234/p1234567890123456?thread_ts=1234567890123456'
+
+# Send a markdown message to a channel (prints the new message's permalink)
+slack-cli write C01234 '**Done** — see [the report](https://example.com)'
+
+# Reply to a message: starts a new thread on it (no thread yet)
+slack-cli write 'https://mywork.slack.com/archives/C01234/p1234567890123456' 'starting a thread'
+
+# Reply inside an existing thread
+slack-cli write 'https://mywork.slack.com/archives/C01234/p1234567890123456?thread_ts=1234567890123456' 'thread reply'
+
+# DM a user by ID
+slack-cli write U01234 'hi there'
+
+# Send a file, or pipe a message through stdin
+echo 'from *stdin*' | slack-cli write C01234
+slack-cli write C01234 --file message.md
 ```
 
 ### Activity
@@ -173,6 +191,27 @@ disappear from it. Links are the permalinks printed by
   and are skipped; the remaining links are still processed.
 - Marks are irreversible. Malformed links or Slack API failures exit
   with an error.
+
+### Write
+
+`slack-cli write <target> [message] [--file PATH]` sends a message as
+you via `chat.postMessage` and prints the new message's permalink.
+The target decides where the message goes:
+
+- A **message link** replies: into the existing thread when the link has
+  `thread_ts`, otherwise the reply starts a new thread on that message.
+- A **channel/DM/group ID** (`C...`, `D...`, `G...`) posts a new
+  top-level message there.
+- A **user ID** (`U...`) resolves your DM with that user and posts there.
+
+The message body is Markdown, converted to Slack mrkdwn before sending
+(`**bold**` → `*bold*`, `[text](url)` → links, `# Heading` → bold line;
+code spans and fenced blocks are sent unchanged). `@name`, `#channel`,
+`@channel`/`@here`/`@everyone` mentions outside code blocks are resolved
+to Slack references — unknown or ambiguous names abort the send with a
+suggestion, so wrap literal `@`/`#` text in backticks. When replying to
+a link, the matching unread activity-feed item is also marked read
+(best effort, like `mark-read`).
 
 ### Mine
 

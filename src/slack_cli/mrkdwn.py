@@ -100,3 +100,67 @@ def _decode_html_entities(text):
     text = text.replace("&lt;", "<")
     text = text.replace("&gt;", ">")
     return text
+
+
+# Marks already-converted bold spans so later passes cannot re-match them
+# as italic (mrkdwn bold `*x*` is valid markdown italic `*x*`).
+_BOLD = "\x00"
+
+
+def to_mrkdwn(text):
+    """Convert markdown text to Slack mrkdwn (inverse of convert)."""
+    parts = _split_code_blocks(text)
+    result = []
+    for part, is_code in parts:
+        result.append(part if is_code else _md_to_mrkdwn_segment(part))
+    return "".join(result)
+
+
+def _md_to_mrkdwn_segment(text):
+    text = _md_links(text)
+    text = _md_bold(text)
+    text = _md_italic(text)
+    text = _md_strikethrough(text)
+    text = _md_headings(text)
+    return text.replace(_BOLD, "*")
+
+
+def _md_links(text):
+    """[text](url) -> <url|text>"""
+    return re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r"<\2|\1>", text)
+
+
+def _md_bold(text):
+    """**x** and __x__ -> bold placeholder"""
+    text = re.sub(
+        r"(?<!\*)\*\*(?!\s)([^*\n]+?)(?<!\s)\*\*(?!\*)",
+        rf"{_BOLD}\1{_BOLD}",
+        text,
+    )
+    return re.sub(
+        r"(?<!_)__(?!_)([^_\n]+?)(?<!_)__(?!_)",
+        rf"{_BOLD}\1{_BOLD}",
+        text,
+    )
+
+
+def _md_italic(text):
+    """*x* -> _x_ (mrkdwn italic is _x_; markdown _x_ needs no change)"""
+    return re.sub(r"(?<![\w*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])", r"_\1_", text)
+
+
+def _md_strikethrough(text):
+    """~~x~~ -> ~x~"""
+    return re.sub(r"(?<!~)~~(?!\s)([^~\n]+?)(?<!\s)~~(?!~)", r"~\1~", text)
+
+
+def _md_headings(text):
+    """# Heading -> *Heading* (mrkdwn has no headings; bold the line)"""
+
+    def repl(m):
+        content = m.group(1)
+        if content.startswith(_BOLD) and content.endswith(_BOLD):
+            return content  # already bold; bold(bold(x)) == bold(x)
+        return f"{_BOLD}{content}{_BOLD}"
+
+    return re.sub(r"^#{1,6}[ \t]+(.+?)[ \t]*$", repl, text, flags=re.MULTILINE)
