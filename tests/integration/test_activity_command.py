@@ -154,6 +154,29 @@ class TestActivityCommand:
                         },
                     ]
                 ),
+                # Unread lookups for D222 (two unread messages).
+                {
+                    "ok": True,
+                    "channel": {"id": "D222", "last_read": "1718972000.000000"},
+                },
+                {
+                    "ok": True,
+                    "messages": [
+                        {"ts": "1718972900.000000", "user": "UCAROL"},
+                        {"ts": "1718972850.000000", "user": "UCAROL"},
+                    ],
+                },
+                # Unread lookups for G333 (one unread message).
+                {
+                    "ok": True,
+                    "channel": {"id": "G333", "last_read": "1718972000.000000"},
+                },
+                {
+                    "ok": True,
+                    "messages": [
+                        {"ts": "1718973000.000000", "user": "UDAVE"},
+                    ],
+                },
             ]
         )
         mock_post.side_effect = side_effect
@@ -177,10 +200,13 @@ class TestActivityCommand:
             "?thread_ts=1718972400000000" in out
         )
         assert "2. DM Carol · 1 unread · last 2024-06-21 12:26 UTC" in out
-        assert "## Direct messages (2)" in out
-        assert "1. DM Carol · last 2024-06-21 12:28 UTC" in out
+        assert "## Direct messages (3)" in out
+        assert "1. DM Carol · @Carol · 2024-06-21 12:28 UTC" in out
         assert f"https://{HOST}/archives/D222/p1718972900000000" in out
-        assert "2. Group DM Dave, Erin · last 2024-06-21 12:30 UTC" in out
+        assert "2. DM Carol · @Carol · 2024-06-21 12:27 UTC" in out
+        assert f"https://{HOST}/archives/D222/p1718972850000000" in out
+        assert "3. Group DM Dave, Erin · @Dave · 2024-06-21 12:30 UTC" in out
+        assert f"https://{HOST}/archives/G333/p1718973000000000" in out
         assert "message_reaction" not in out
 
         # Feed request uses unread-only server-side filter
@@ -245,6 +271,17 @@ class TestActivityCommand:
                         _dm_item("D222", "1718972900.000000"),
                     ]
                 ),
+                {
+                    "ok": True,
+                    "channel": {"id": "D222", "last_read": "1718972000.000000"},
+                },
+                {
+                    "ok": True,
+                    "messages": [
+                        {"ts": "1718972900.000000", "user": "UCAROL"},
+                        {"ts": "1718972850.000000", "user": "UCAROL"},
+                    ],
+                },
             ]
         )
 
@@ -257,6 +294,7 @@ class TestActivityCommand:
             f"https://{HOST}/archives/C111/p1718972700000000"
             "?thread_ts=1718972400000000\n"
             f"https://{HOST}/archives/D222/p1718972900000000\n"
+            f"https://{HOST}/archives/D222/p1718972850000000\n"
         )
 
     @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
@@ -352,6 +390,20 @@ class TestActivityCommand:
                         "profile": {"display_name": "Carol"},
                     },
                 },
+                # Unread lookup for D222 (resolve_dm's info came from cache miss above).
+                {
+                    "ok": True,
+                    "channel": {
+                        "id": "D222",
+                        "last_read": "1718972000.000000",
+                    },
+                },
+                {
+                    "ok": True,
+                    "messages": [
+                        {"ts": "1718972900.000000", "user": "UCAROL"},
+                    ],
+                },
             ]
         )
 
@@ -359,7 +411,29 @@ class TestActivityCommand:
 
         out = capsys.readouterr().out
         assert "#eng · @Alice" in out
-        assert "DM Carol" in out
+        assert "DM Carol · @Carol · 2024-06-21 12:28 UTC" in out
+
+    @patch("slack_cli.commands._shared.load_cache", return_value=PRELOADED_CACHE)
+    @patch("slack_cli.commands._shared.save_cache")
+    @patch("requests.post")
+    def test_dm_unread_lookup_failure_falls_back_to_latest(
+        self, mock_post, mock_save, mock_load, capsys
+    ):
+        """History failure -> single entry for the feed's latest message."""
+        mock_post.side_effect, _ = _mock_post(
+            [
+                AUTH_OK,
+                _feed([_dm_item("D222", "1718972900.000000")]),
+                {"ok": False, "error": "channel_not_found"},
+            ]
+        )
+
+        run(_make_args(), _make_config())
+
+        out = capsys.readouterr().out
+        assert "## Direct messages (1)" in out
+        assert "1. DM Carol · 2024-06-21 12:28 UTC" in out
+        assert f"https://{HOST}/archives/D222/p1718972900000000" in out
 
     @patch("requests.post")
     def test_missing_tokens_exits(self, mock_post, capsys):

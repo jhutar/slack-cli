@@ -68,9 +68,7 @@ def run(args, config):
         m["author"] = resolve_user(api, m.pop("author_id"), cache, cache_path)
     for d in mentions + threads:
         attach_label(api, d, my_id, cache, cache_path)
-    for dm in dms:
-        # DM and group DM both resolve to participant names, not #channel.
-        resolve_dm(api, dm, my_id, cache, cache_path)
+    dms = _expand_dm_unread(api, dms, my_id, cache, cache_path)
 
     sys.stdout.write(
         _links_only(mentions, threads, dms, host)
@@ -166,6 +164,51 @@ def _classify(items):
     return mentions, threads, dms
 
 
+def _expand_dm_unread(api, dms, my_id, cache, cache_path):
+    """Expand each DM feed entry into one entry per unread message.
+
+    The feed only carries the latest unread message; history since the
+    conversation's last_read fills in any older unread ones. Falls back
+    to the feed's latest message when those lookups fail.
+    """
+    out = []
+    for dm in dms:
+        # DM and group DM both resolve to participant names, not #channel.
+        resolve_dm(api, dm, my_id, cache, cache_path)
+        msgs = _unread_messages(api, dm["channel_id"]) or [{"ts": dm["ts"]}]
+        for msg in sorted(msgs, key=lambda m: float(m["ts"]), reverse=True):
+            entry = dict(dm)
+            entry["ts"] = msg["ts"]
+            entry["author"] = (
+                resolve_user(api, msg["user"], cache, cache_path)
+                if msg.get("user")
+                else None
+            )
+            out.append(entry)
+    return out
+
+
+def _unread_messages(api, cid):
+    """All unread top-level messages in a conversation, empty on failure.
+
+    oldest is exclusive, so messages at or before last_read (already
+    read) are not returned.
+    """
+    try:
+        info = api.call("conversations.info", {"channel": cid})
+        last_read = info.get("channel", {}).get("last_read")
+        if not last_read:
+            return []
+        resp = api.call(
+            "conversations.history",
+            {"channel": cid, "oldest": last_read, "limit": "50"},
+        )
+        return resp.get("messages", [])
+    except SlackAPIError as e:
+        logger.warning("unread lookup failed for %s: %s", cid, e)
+        return []
+
+
 def _links_only(mentions, threads, dms, host):
     """One URL per line, no header — for machine processing."""
     lines = [link(host, m["channel_id"], m["ts"], m["thread_ts"]) for m in mentions]
@@ -210,7 +253,8 @@ def _format(mentions, threads, dms, host):
         lines.append(f"## Direct messages ({len(dms)})")
         lines.append("")
         for i, dm in enumerate(dms, 1):
-            lines.append(f"{i}. {dm['label']} · last {fmt_ts(dm['ts'])}")
+            author = f"@{dm['author']} · " if dm.get("author") else ""
+            lines.append(f"{i}. {dm['label']} · {author}{fmt_ts(dm['ts'])}")
             lines.append(f"   {link(host, dm['channel_id'], dm['ts'])}")
         lines.append("")
 
